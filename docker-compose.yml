@@ -1,0 +1,81 @@
+name: orchestra
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"] # AOF persistence so queued jobs survive a restart
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  server:
+    build: ./server
+    restart: unless-stopped
+    ports:
+      - "5002:5001"
+    environment:
+      PORT: 5000
+      MONGO_URI: mongodb://mongo:27017/orchestra
+      REDIS_HOST: redis
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      CLIENT_ORIGIN: http://localhost:5173
+      DATA_DIR: /data
+      SEED_ON_START: "true"
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      RATE_LIMIT_PER_MIN: ${RATE_LIMIT_PER_MIN:-20}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+    volumes:
+      - app-data:/data
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: ./worker
+    restart: unless-stopped
+    environment:
+      MONGO_URI: mongodb://mongo:27017/orchestra
+      REDIS_HOST: redis
+      DATA_DIR: /data
+      WORKER_CONCURRENCY: 5
+      MAIL_MODE: ${MAIL_MODE:-json}
+      SIMULATE_WORK_MS: ${SIMULATE_WORK_MS:-1500}
+    volumes:
+      - app-data:/data
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  client:
+    build: ./client
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+
+volumes:
+  mongo-data:
+  redis-data:
+  app-data:
