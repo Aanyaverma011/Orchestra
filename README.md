@@ -13,6 +13,11 @@ The system separates job submission from execution, allowing workers to process 
 
 <img width="1470" height="956" alt="Screenshot 2026-11-18 at 8 10 41 PM" src="https://github.com/user-attachments/assets/a5a18551-8316-4e22-b566-459a6e82da02" />
 
+## Live Deployment
+
+**Live Application:** [https://orchestra-aanya.duckdns.org/app](https://orchestra-aanya.duckdns.org/app)
+
+Orchestra is deployed and accessible through its live web application. Open the link above to explore the dashboard and experience its job management and monitoring features.
 
 ### Dashboard Overview
 
@@ -42,6 +47,7 @@ The system separates job submission from execution, allowing workers to process 
 </table>
 
 ---
+
 
 ## Tech Stack
 
