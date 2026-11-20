@@ -5,18 +5,26 @@ An Express API accepts jobs and puts them on a Redis-backed BullMQ queue. Separa
 
 > Submitting a job returns in milliseconds. The slow work (emails, PDF reports, CSV processing) happens in the background, on workers you can scale independently.
 
-![Landing page](docs/screenshots/landing.png)
+<img width="1470" height="956" alt="Screenshot 2026-11-20 at 7 08 26 PM" src="https://github.com/user-attachments/assets/3985aeaa-9da6-4cda-a836-2328cac83cb0" />
 
-![Overview dashboard](docs/screenshots/overview.png)
+<img width="1470" height="956" alt="Screenshot 2026-11-20 at 7 08 35 PM" src="https://github.com/user-attachments/assets/7b1508e7-cdbd-45a4-8ff9-6814f6bb1a42" />
+
+
+<img width="1470" height="956" alt="Screenshot 2026-11-20 at 7 09 15 PM" src="https://github.com/user-attachments/assets/76bb24f0-16fe-410d-b77d-c2199e99b390" />
+
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/job-details.png" alt="Job details drawer with failure explanation"></td>
-    <td width="50%"><img src="docs/screenshots/create-job.png" alt="Create job form with request preview"></td>
+    <td width="50%"><img width="1470" height="956" alt="Screenshot 2026-11-20 at 7 08 47 PM" src="https://github.com/user-attachments/assets/f494d041-74ad-47fb-90e0-50bb1c237b21" />
+</td>
+    <td width="50%"><img width="1470" height="956" alt="Screenshot 2026-11-20 at 7 08 59 PM" src="https://github.com/user-attachments/assets/96cd137f-1daa-4bdc-915e-f2eb3e72d3ab" />
+</td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/dead-letters.png" alt="Dead letters page"></td>
-    <td width="50%"><img src="docs/screenshots/workers.png" alt="Workers page"></td>
+    <td width="50%"><img width="1470" height="956" alt="Screenshot 2026-11-20 at 7 09 07 PM" src="https://github.com/user-attachments/assets/31b5c678-d03d-4b65-809b-c390eb5b4d99" />
+</td>
+    <td width="50%"><img width="1470" height="956" alt="Screenshot 2026-11-20 at 7 09 23 PM" src="https://github.com/user-attachments/assets/386927e0-cdbf-4353-b75a-ea86b1560930" />
+</td>
   </tr>
 </table>
 
@@ -42,7 +50,7 @@ These are created on first start (`SEED_ON_START`). Change `JWT_SECRET` and turn
 - **Users and workers are different things.** A worker is a background process that runs jobs. Signing in never creates one. The default setup runs one worker, so "1 worker" is correct.
 - **More workers:** `docker compose up -d --scale worker=3`, then open Admin > Workers. Three cards appear.
 - **Several people at once:** each browser tab keeps its own login by default. Open one normal tab as Admin, a second tab (or another browser) as one member, a third as another member. All incognito windows share one session, so use a different browser profile or tab instead. Admin > Workers > *People signed in* lists everyone online.
-- **Starting clean:** sample jobs are off by default. If you ran an older version, remove old data once with `docker compose down -v`.
+- **Starting clean:** sample jobs are off by default. To wipe all local data, run `docker compose down -v`. This deletes every user and job, so never run it on a live server.
 - Admin sees every user's jobs in the totals, members see only their own.
 
 ## Architecture
@@ -76,7 +84,7 @@ On error: `processing` → `retrying` (exponential backoff 2s, 4s, 8s) → `dead
 ## What is implemented
 
 **Interface**
-- **Scrollable landing page** (`/`) with a self-running pipeline preview, animated counters, scroll reveals, an interactive job-lifecycle explainer, FAQ and call to action (Framer Motion).
+- **Landing page** (`/`) with a queue-monitor preview, how it works, features, an interactive job-lifecycle explainer, architecture, FAQ and call to action.
 - **Dashboard** (`/app`): summary cards, live pipeline, throughput chart, jobs by status, recent jobs and a live activity feed. Sidebar badges for running and dead jobs, page transitions.
 - **Notification bell** that collects completed, failed and retried jobs in real time.
 - **Jobs page**: filters, search, CSV export of the current filter, compact or comfortable density. Open a job to see its log; queued, scheduled and retrying jobs can be cancelled from there.
@@ -104,9 +112,9 @@ On error: `processing` → `retrying` (exponential backoff 2s, 4s, 8s) → `dead
 5. **Crash recovery.** Start a long job (a report with 50,000 employees). Find a worker with `docker compose ps`, then `docker kill <that worker container>`. Another worker finishes the job after BullMQ's lock expires, about a minute with the default settings. The job log shows "The worker running this job stopped responding". Use `docker kill`, not `docker stop`: stop sends SIGTERM and the worker drains gracefully by design.
 6. **Idempotency.** Submit the form twice quickly. One job is created.
 
-## Load test (your resume number)
+## Load test
 
-The guide says to put only numbers you measured on your resume. This script measures them.
+Use this script to measure throughput on your own machine.
 
 ```bash
 # 1. Start with a high rate limit and a short simulated delay, one worker
@@ -118,9 +126,9 @@ RATE_LIMIT_PER_MIN=100000 SIMULATE_WORK_MS=200 docker compose up -d --scale work
 node scripts/loadtest.js --jobs 500 --work-ms 200
 ```
 
-It registers its own user, submits the jobs through the real API, waits until all finish, and prints the API response times, total time, throughput and a resume line. Notes for honest reporting:
+It registers its own user, submits the jobs through the real API, waits until all finish, and prints the API response times, total time and throughput. Notes for reading the results:
 
-- The result depends on your machine, on `SIMULATE_WORK_MS` (the pause inside every job) and on MongoDB speed. State the settings next to the number, as the printed resume line does.
+- The result depends on your machine, on `SIMULATE_WORK_MS` (the pause inside every job) and on MongoDB speed. State the settings next to any number you share.
 - Run it a few times and report a typical run. If three workers are not faster than one, look at CPU and MongoDB first, because every job makes several database writes.
 - Reaching `429` means the rate limit was not raised. Restart with `RATE_LIMIT_PER_MIN=100000`.
 
@@ -181,10 +189,63 @@ Copy `.env.example` to `.env` next to `docker-compose.yml` to change these. Ever
 orchestra/
   docker-compose.yml
   .env.example
-  scripts/loadtest.js     load test for your resume number
+  scripts/loadtest.js     load test
   docs/screenshots/       images used above
-  client/   React + Vite dashboard (Source Sans 3 and Source Serif 4, design tokens, dark and light themes)
+  client/   React + Vite app (Source Sans 3, white-and-orange light theme, dark theme in the dashboard)
   server/   Express API: routes, controllers, middleware, queue producer, sockets, sweeper, explain service, tests
   worker/   BullMQ worker and processors (email, report, csv), tests
   .github/  CI workflow
+```
+
+## Recent additions
+
+- **White-and-orange light theme** across the landing page, sign-in page and dashboard. Dark mode is still available inside the dashboard (`/app`) from the top bar or Settings; the home, sign-in and help pages are always light.
+- **Calendar-and-clock logo**, used as the app logo and browser icon.
+- **Help and legal pages** linked from the footer: Privacy, Terms of use, Legal disclosure, Copyright, Trademark, Disclaimer, API Policy, Contact and a Help portal.
+- **Cookie Preferences** in the footer. Shows what the app keeps in the browser (a sign-in token, theme and table density; no cookies or trackers) and can clear the saved settings.
+- **Sign-in health check.** The sign-in page checks the API when it loads and says exactly what is wrong (API not running, MongoDB or Redis down) instead of a generic "Could not sign you in" message.
+- **API moved to port 5050**, because macOS uses port 5000 for AirPlay Receiver.
+- **Dead-letter retry that actually succeeds.** Retrying switches off the *Simulate outage* flag, and an admin can correct a bad email address before retrying. CSV jobs whose file is missing are refused with a clear message instead of failing again.
+- **Cancel from the job panel.** Queued, scheduled and retrying jobs show a Cancel button; running jobs explain why they can no longer be cancelled.
+
+## Deploying (HTTPS with Caddy)
+
+On the server, keep host-specific settings in `docker-compose.override.yml`. Docker Compose loads it automatically, and git does not track it, so `git pull` never conflicts. It adds a Caddy container that serves the site over HTTPS and sets `CLIENT_ORIGIN` to your domain:
+
+```yaml
+services:
+  server:
+    environment:
+      CLIENT_ORIGIN: https://your-domain.example
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - client
+volumes:
+  caddy-data:
+  caddy-config:
+```
+
+`Caddyfile`:
+
+```
+your-domain.example {
+    encode gzip
+    reverse_proxy client:80
+}
+```
+
+Only ports 22, 80 and 443 need to be open in the firewall or security group. To update a running server:
+
+```bash
+git pull
+sudo docker compose up -d --build
 ```
