@@ -15,6 +15,7 @@ export default function JobDrawer({ jobId, onClose, onChanged }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [explaining, setExplaining] = useState(false);
+  const [to, setTo] = useState('');
   const closeRef = useRef(null);
 
   const load = useCallback(() => {
@@ -22,6 +23,7 @@ export default function JobDrawer({ jobId, onClose, onChanged }) {
       .get(`/jobs/${jobId}`)
       .then((r) => {
         setJob(r.data);
+        if (r.data.type === 'send-email') setTo((cur) => cur || r.data.payload?.to || '');
         setError('');
       })
       .catch((e) => setError(errorMessage(e, 'Could not load this job.')));
@@ -29,6 +31,7 @@ export default function JobDrawer({ jobId, onClose, onChanged }) {
 
   useEffect(() => {
     setJob(null);
+    setTo('');
     load();
   }, [load]);
 
@@ -80,7 +83,7 @@ export default function JobDrawer({ jobId, onClose, onChanged }) {
   };
 
   const cancel = () => act(() => api.post(`/jobs/${jobId}/cancel`), 'Job cancelled');
-  const retry = () => act(() => api.post(`/admin/dead-letter/${jobId}/retry`), 'Job re-queued');
+  const retry = () => act(() => api.post(`/admin/dead-letter/${jobId}/retry`, job.type === 'send-email' ? { to } : {}), 'Job sent back to the queue');
 
   const download = async () => {
     try {
@@ -96,7 +99,7 @@ export default function JobDrawer({ jobId, onClose, onChanged }) {
     }
   };
 
-  const canCancel = job && ['queued', 'scheduled'].includes(job.status);
+  const canCancel = job && ['queued', 'scheduled', 'retrying'].includes(job.status);
   const canRetry = job && job.status === 'dead' && isAdmin;
 
   return (
@@ -245,14 +248,17 @@ export default function JobDrawer({ jobId, onClose, onChanged }) {
                 <Download size={15} /> Download file
               </button>
             )}
+            {canRetry && job.type === 'send-email' && (
+              <input className="input" style={{ maxWidth: 220, height: 34 }} value={to} onChange={(e) => setTo(e.target.value)} placeholder="Recipient email" aria-label="Recipient email for the retry" />
+            )}
             {canRetry && (
               <button className="btn primary" disabled={busy} onClick={retry}>
-                <RotateCcw size={15} /> Retry job
+                <RotateCcw size={15} /> {busy ? 'Retrying…' : 'Retry job'}
               </button>
             )}
             {canCancel && (
               <button className="btn danger" disabled={busy} onClick={cancel}>
-                <Ban size={15} /> Cancel job
+                <Ban size={15} /> {busy ? 'Cancelling…' : 'Cancel job'}
               </button>
             )}
           </div>

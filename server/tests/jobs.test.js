@@ -109,6 +109,45 @@ describe('dead-letter retry', () => {
     expect(res.body.status).toBe('queued');
     expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({ jobId: job.id }));
   });
+
+  test('retry switches off a simulated outage so the job can actually succeed', async () => {
+    const { token } = await registerUser();
+    const admin = await makeAdmin();
+    const job = (await post(token, { ...emailJob, payload: { to: 'a@b.com', forceFail: true } })).body;
+    await Job.updateOne({ _id: job.id }, { status: 'dead', attempts: 4, error: 'SMTP connection timed out' });
+    enqueue.mockClear();
+
+    const res = await request(app).post(`/api/admin/dead-letter/${job.id}/retry`).set('Authorization', `Bearer ${admin.token}`);
+    expect(res.status).toBe(200);
+    expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({ payload: { to: 'a@b.com' } }));
+    expect((await Job.findById(job.id)).payload.forceFail).toBeUndefined();
+  });
+
+  test('a bad recipient must be corrected before retrying', async () => {
+    const { token } = await registerUser();
+    const admin = await makeAdmin();
+    const job = (await post(token, { ...emailJob, payload: { to: 'not-an-email' } })).body;
+    await Job.updateOne({ _id: job.id }, { status: 'dead', attempts: 4, error: 'Invalid recipient address' });
+    const url = `/api/admin/dead-letter/${job.id}/retry`;
+
+    const no = await request(app).post(url).set('Authorization', `Bearer ${admin.token}`);
+    expect(no.status).toBe(400);
+
+    const ok = await request(app).post(url).set('Authorization', `Bearer ${admin.token}`).send({ to: 'fixed@example.com' });
+    expect(ok.status).toBe(200);
+    expect((await Job.findById(job.id)).payload.to).toBe('fixed@example.com');
+  });
+});
+
+describe('cancel a job waiting to retry', () => {
+  test('a retrying job can be cancelled', async () => {
+    const { token } = await registerUser();
+    const job = (await post(token)).body;
+    await Job.updateOne({ _id: job.id }, { status: 'retrying' });
+    const res = await request(app).post(`/api/jobs/${job.id}/cancel`).set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('cancelled');
+  });
 });
 
 describe('idempotency marker in Redis', () => {

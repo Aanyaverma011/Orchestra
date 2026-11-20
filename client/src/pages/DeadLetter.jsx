@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, RotateCcw, Skull } from 'lucide-react';
+import { CheckCircle2, RotateCcw } from 'lucide-react';
 import api, { errorMessage } from '../api';
 import { useLive } from '../context/LiveContext';
 import { useToast } from '../context/ToastContext';
@@ -14,6 +14,7 @@ export default function DeadLetter() {
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [openId, setOpenId] = useState(null);
+  const [fixes, setFixes] = useState({}); // corrected email addresses, by job id
 
   const load = useCallback(() => {
     api.get('/admin/dead-letter').then((r) => { setItems(r.data.items); setError(''); }).catch((e) => setError(errorMessage(e, 'Could not load dead letters.')));
@@ -22,11 +23,13 @@ export default function DeadLetter() {
 
   useEffect(() => subscribe((e) => e.status === 'dead' && setTimeout(load, 600)), [subscribe, load]);
 
+  const bodyFor = (job) => (job.type === 'send-email' ? { to: fixes[job.id] ?? job.payload?.to ?? '' } : {});
+
   const retry = async (job) => {
     setBusyId(job.id);
     try {
-      await api.post(`/admin/dead-letter/${job.id}/retry`);
-      toast.push(`"${job.name}" re-queued`);
+      await api.post(`/admin/dead-letter/${job.id}/retry`, bodyFor(job));
+      toast.push(`"${job.name}" is back in the queue`);
       setItems((cur) => cur.filter((j) => j.id !== job.id));
     } catch (e) {
       toast.push(errorMessage(e), { kind: 'err' });
@@ -38,9 +41,10 @@ export default function DeadLetter() {
   const retryAll = async () => {
     if (!items?.length) return;
     setBusyId('all');
-    const results = await Promise.allSettled(items.map((j) => api.post(`/admin/dead-letter/${j.id}/retry`)));
+    const results = await Promise.allSettled(items.map((j) => api.post(`/admin/dead-letter/${j.id}/retry`, bodyFor(j))));
     const ok = results.filter((r) => r.status === 'fulfilled').length;
-    toast.push(`${ok} of ${items.length} jobs re-queued`, { kind: ok ? 'ok' : 'err' });
+    const failed = items.length - ok;
+    toast.push(failed ? `${ok} re-queued, ${failed} need a fix first (see the message on each card)` : `${ok} job${ok === 1 ? '' : 's'} re-queued`, { kind: ok ? 'ok' : 'err' });
     setBusyId(null);
     load();
   };
@@ -49,12 +53,11 @@ export default function DeadLetter() {
     <div className="stack">
       {error && <ErrorBanner>{error}</ErrorBanner>}
       {items?.length > 0 && (
-        <div className="bulkbar">
-          <Skull size={16} style={{ color: 'var(--dead)' }} />
-          <b>{items.length} dead job{items.length === 1 ? '' : 's'}</b>
-          <span className="muted">Read each error first. Retrying puts a job back at the front of the line.</span>
-          <span className="grow" />
-          <button className="btn primary sm" onClick={retryAll} disabled={busyId === 'all'}><RotateCcw size={14} /> {busyId === 'all' ? 'Retrying…' : 'Retry all'}</button>
+        <div className="toolbar" style={{ marginBottom: 0 }}>
+          <span><b>{items.length}</b> dead job{items.length === 1 ? '' : 's'}. Read the error, fix the input if needed, then retry.</span>
+          <div className="toolbar-end">
+            <button className="btn sm" onClick={retryAll} disabled={busyId === 'all'}><RotateCcw size={14} /> {busyId === 'all' ? 'Retrying…' : 'Retry all'}</button>
+          </div>
         </div>
       )}
       {items === null ? (
@@ -75,11 +78,23 @@ export default function DeadLetter() {
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
                   <button className="btn sm" onClick={() => setOpenId(j.id)}>View log</button>
                   <button className="btn primary sm" disabled={busyId === j.id} onClick={() => retry(j)}>
-                    <RotateCcw size={14} /> {busyId === j.id ? 'Retrying…' : 'Retry job'}
+                    <RotateCcw size={14} /> {busyId === j.id ? 'Retrying…' : 'Retry'}
                   </button>
                 </div>
               </header>
               <div className="callout"><b>Last error</b><p>{j.error || 'No error message recorded.'}</p></div>
+              {j.type === 'send-email' && (
+                <label className="dead-fix">
+                  <span className="muted">Send to</span>
+                  <input
+                    className="input"
+                    value={fixes[j.id] ?? j.payload?.to ?? ''}
+                    onChange={(e) => setFixes((f) => ({ ...f, [j.id]: e.target.value }))}
+                    placeholder="name@example.com"
+                  />
+                  {j.payload?.forceFail && <span className="hint">The simulated outage is switched off when you retry.</span>}
+                </label>
+              )}
               <div className="meta">
                 <TypeLabel type={j.type} />
                 <span className="mono">#{shortId(j.id)}</span>

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, RotateCcw, Zap } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { errorMessage } from '../api';
+import api, { errorMessage } from '../api';
 import { ErrorBanner, Logo } from '../components/atoms';
+import { useLightTheme } from '../hooks/useTheme';
 
 const PERKS = [
   [Zap, 'Instant submit', 'Jobs return in milliseconds and run in the background.'],
@@ -13,6 +14,7 @@ const PERKS = [
 ];
 
 export default function Login() {
+  useLightTheme();
   const { user, login, register } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState('login');
@@ -21,6 +23,17 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [show, setShow] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [apiDown, setApiDown] = useState('');
+
+  // Check the API once, so a stopped server is reported before anyone types a password.
+  useEffect(() => {
+    api.get('/health').then(() => setApiDown('')).catch((e) => {
+      const d = e?.response?.data;
+      // /health answers 503 with { ok: false } when MongoDB or Redis is down.
+      if (d && d.ok === false) setApiDown(`The API is running but ${!d.mongo ? 'MongoDB' : 'Redis'} is not reachable. Start it and reload this page.`);
+      else setApiDown(errorMessage(e, 'Cannot reach the API server.'));
+    });
+  }, []);
 
   if (user) return <Navigate to="/app" replace />;
 
@@ -59,16 +72,13 @@ export default function Login() {
   return (
     <div className="auth">
       <section className="auth-art">
-        <span className="orb o1" aria-hidden="true" />
-        <span className="orb o2" aria-hidden="true" />
-        <span className="grid-bg" aria-hidden="true" />
         <Link to="/" className="brand"><Logo size={32} />Orchestra</Link>
         <div className="auth-copy">
           <motion.h2 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            Run background work <em>without making anyone wait</em>
+            Send the slow work to the back room. <em>Keep the front desk quick.</em>
           </motion.h2>
           <motion.p className="lede" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.6 }}>
-            Submit a job, watch it move from queued to completed, retry what fails and scale workers up or down.
+            Emails, reports and CSV imports run on background workers. You see every job's status as it changes.
           </motion.p>
           <ul className="auth-perks">
             {PERKS.map(([Icon, t, d], i) => (
@@ -91,6 +101,7 @@ export default function Login() {
             </p>
           </div>
 
+          {apiDown && !error && <ErrorBanner>{apiDown}</ErrorBanner>}
           {error && <ErrorBanner>{error}</ErrorBanner>}
 
           <form className="form" onSubmit={submit}>

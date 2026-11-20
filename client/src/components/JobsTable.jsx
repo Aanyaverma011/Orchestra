@@ -1,17 +1,12 @@
 import { StatusPill, Priority, TypeLabel, Meter } from './atoms';
 import { fmtDuration, shortId, timeAgo } from '../lib/format';
 
-export default function JobsTable({ jobs, onOpen, flashId, showOwner = false, compact = false, selected, onToggle, onToggleAll }) {
-  const selectable = Boolean(onToggle);
-  const allOn = selectable && jobs.length > 0 && jobs.every((j) => selected?.has(j.id));
+export default function JobsTable({ jobs, onOpen, flashId, showOwner = false, compact = false }) {
   return (
     <div className="table-wrap">
       <table className="t">
         <thead>
           <tr>
-            {selectable && (
-              <th className="sel"><input type="checkbox" aria-label="Select all on this page" checked={allOn} onChange={onToggleAll} /></th>
-            )}
             <th>Job</th>
             <th>Type</th>
             {!compact && <th>Priority</th>}
@@ -26,17 +21,12 @@ export default function JobsTable({ jobs, onOpen, flashId, showOwner = false, co
           {jobs.map((j) => (
             <tr
               key={j.id}
-              className={`clickable ${flashId === j.id ? 'flash' : ''} ${selected?.has(j.id) ? 'picked' : ''}`}
+              className={`clickable ${flashId === j.id ? 'flash' : ''}`}
               onClick={() => onOpen(j.id)}
               tabIndex={0}
               onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onOpen(j.id))}
               aria-label={`Open ${j.name}`}
             >
-              {selectable && (
-                <td className="sel" onClick={(e) => e.stopPropagation()}>
-                  <input type="checkbox" aria-label={`Select ${j.name}`} checked={selected?.has(j.id) || false} onChange={() => onToggle(j.id)} />
-                </td>
-              )}
               <td>
                 <div className="name-cell">
                   <b title={j.name}>{j.name}</b>

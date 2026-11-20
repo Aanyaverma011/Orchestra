@@ -1,96 +1,86 @@
-import { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { FileSpreadsheet, FileText, Mail } from 'lucide-react';
+import { useState } from 'react';
 
-const POOL = [
-  { name: 'Attendance report', type: 'report' },
-  { name: 'Customer import', type: 'csv' },
-  { name: 'Welcome email', type: 'email' },
-  { name: 'Payment receipt', type: 'email' },
-  { name: 'Payroll export', type: 'csv' },
-  { name: 'Monthly summary', type: 'report' },
-  { name: 'Password reset', type: 'email' },
-  { name: 'Invoice batch', type: 'report' },
+/*
+ * A still snapshot of the queue monitor, shown in the landing hero.
+ * No timers or motion: it reads like a screenshot, but the filter tabs work.
+ */
+
+const JOBS = [
+  { id: '7c78f7', name: 'payroll-2026-11', type: 'generate-report', worker: 'w-2', attempt: '2/4', started: '14:02:11', time: '1.1s', status: 'running' },
+  { id: '571f64', name: 'attendance-q4', type: 'generate-report', worker: 'w-1', attempt: '1/4', started: '14:02:09', time: '2.7s', status: 'running' },
+  { id: 'aaa3b8', name: 'invoice-reminder', type: 'send-email', worker: '—', attempt: '1/4', started: '14:02:10', time: '+1.3s', status: 'retrying' },
+  { id: 'c6c3ec', name: 'customers.csv', type: 'process-csv', worker: 'w-3', attempt: '1/4', started: '14:02:11', time: '1.4s', status: 'running' },
+  { id: 'e712ab', name: 'password-reset', type: 'send-email', worker: 'w-1', attempt: '1/4', started: '14:02:10', time: '142ms', status: 'completed' },
+  { id: '23819f', name: 'receipt-88214', type: 'send-email', worker: 'w-3', attempt: '1/4', started: '14:02:08', time: '228ms', status: 'completed' },
+  { id: '6e34c5', name: 'catalogue-sync.csv', type: 'process-csv', worker: '—', attempt: '—', started: '—', time: '—', status: 'queued' },
 ];
-const ICON = { report: FileText, csv: FileSpreadsheet, email: Mail };
-const LABEL = { queued: 'Queued', processing: 'Processing', completed: 'Completed', retrying: 'Retrying', dead: 'Dead' };
 
-let uid = 0;
-const make = (i, status = 'queued') => ({ id: ++uid, ...POOL[i % POOL.length], status, progress: 0, flaky: i % 5 === 3, tries: 0, hold: 0 });
+const WORKERS = [['w-1', 2], ['w-2', 1], ['w-3', 1]];
+const SLOTS = 5;
+const LABEL = { queued: 'queued', running: 'running', retrying: 'backoff', completed: 'done' };
 
-/** A small self-running simulation of the pipeline, used on the landing page. */
 export default function LiveDemo() {
-  const cursor = useRef(4);
-  const [jobs, setJobs] = useState(() => [make(0, 'completed'), make(1, 'processing'), make(2), make(3)].map((j, k) => (k === 0 ? { ...j, progress: 100 } : k === 1 ? { ...j, progress: 40 } : j)));
-  const [done, setDone] = useState(1284);
-
-  useEffect(() => {
-    const t = setInterval(() => {
-      let finished = 0;
-      setJobs((cur) => {
-        let next = cur.map((j) => {
-          if (j.status === 'queued') return { ...j, status: 'processing', progress: 6 };
-          if (j.status === 'processing') {
-            const p = Math.min(100, j.progress + 18 + Math.random() * 16);
-            if (p < 100) return { ...j, progress: p };
-            if (j.flaky && j.tries === 0) return { ...j, status: 'retrying', progress: 0, tries: 1, hold: 2 };
-            finished += 1;
-            return { ...j, status: 'completed', progress: 100, hold: 3 };
-          }
-          if (j.status === 'retrying') return j.hold > 1 ? { ...j, hold: j.hold - 1 } : { ...j, status: 'processing', progress: 8 };
-          if (j.status === 'completed') return { ...j, hold: j.hold - 1 };
-          return j;
-        });
-        next = next.filter((j) => !(j.status === 'completed' && j.hold <= 0));
-        while (next.length < 4) next = [...next, make(cursor.current++)];
-        return next;
-      });
-      if (finished) setDone((d) => d + finished);
-    }, 1100);
-    return () => clearInterval(t);
-  }, []);
-
-  const count = (s) => jobs.filter((j) => j.status === s).length;
+  const [filter, setFilter] = useState('all');
+  const count = (s) => JOBS.filter((j) => j.status === s).length;
+  const tabs = [['all', 'All', JOBS.length], ['running', 'Running', count('running')], ['retrying', 'Backoff', count('retrying')], ['completed', 'Done', count('completed')]];
+  const rows = filter === 'all' ? JOBS : JOBS.filter((j) => j.status === filter);
 
   return (
-    <div className="demo" aria-label="Animated preview of the Orchestra dashboard">
-      <div className="demo-bar">
-        <i /><i /><i />
-        <span>orchestra / overview</span>
-        <b className="demo-live"><u /> Live</b>
+    <div className="mock" aria-label="Snapshot of the Orchestra queue monitor">
+      <div className="mock-bar">
+        <span>orchestra <i>/</i> overview</span>
+        <span className="mock-live">3 workers online</span>
       </div>
-      <div className="demo-body">
-        <div className="demo-stages">
-          {[['queued', count('queued')], ['processing', count('processing') + count('retrying')], ['completed', done]].map(([s, n], i) => (
-            <div key={s} className="demo-stage" data-s={s}>
-              <span><i />{s === 'processing' ? 'Processing' : s === 'queued' ? 'Queued' : 'Completed'}</span>
-              <motion.b key={n} initial={{ y: 6, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="num">{n.toLocaleString('en')}</motion.b>
-              {i < 2 && <em className={`demo-arrow ${i === 0 ? 'go' : ''}`} />}
-            </div>
+
+      <div className="mock-tools">
+        <div className="mock-tabs" role="tablist" aria-label="Filter jobs">
+          {tabs.map(([k, label, c]) => (
+            <button key={k} role="tab" aria-selected={filter === k} onClick={() => setFilter(k)}>
+              {label} <span>{c}</span>
+            </button>
           ))}
         </div>
-        <ul className="demo-list">
-          <AnimatePresence initial={false} mode="popLayout">
-            {jobs.map((j) => {
-              const Icon = ICON[j.type];
-              return (
-                <motion.li
-                  key={j.id}
-                  layout
-                  initial={{ opacity: 0, y: 14, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: 24 }}
-                  transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-                >
-                  <span className="demo-ico"><Icon size={15} /></span>
-                  <span className="demo-name">{j.name}<small className="mono">#{String(j.id * 7919).slice(-5)}</small></span>
-                  <span className="demo-meter"><b style={{ width: `${j.progress}%` }} data-s={j.status} /></span>
-                  <span className="pill" data-status={j.status}><i />{LABEL[j.status]}</span>
-                </motion.li>
-              );
-            })}
-          </AnimatePresence>
-        </ul>
+        <span className="mock-query">queue:orchestra-jobs</span>
+      </div>
+
+      <div className="mock-stats">
+        <div><span>completed</span><b>18,421</b></div>
+        <div><span>p95</span><b>3.0s</b></div>
+        <div><span>retries</span><b>4 × exp</b></div>
+        <div><span>workers</span><b>3 × {SLOTS}</b></div>
+      </div>
+
+      <div className="mock-scroll">
+        <table className="mock-table">
+          <thead>
+            <tr><th>id</th><th>job</th><th>worker</th><th className="r">try</th><th className="r">started</th><th className="r">time</th><th>state</th></tr>
+          </thead>
+          <tbody>
+            {rows.map((j) => (
+              <tr key={j.id} data-s={j.status}>
+                <td className="dim">{j.id}</td>
+                <td><span className="mock-name">{j.name}</span><span className="mock-type">{j.type}</span></td>
+                <td className={j.worker === '—' ? 'dim' : ''}>{j.worker}</td>
+                <td className="r">{j.attempt}</td>
+                <td className="r dim">{j.started}</td>
+                <td className="r">{j.time}</td>
+                <td><span className="mock-state">{LABEL[j.status]}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mock-workers">
+        {WORKERS.map(([w, used]) => (
+          <div key={w} className="mock-worker">
+            <span>{w}</span>
+            <span className="slots" aria-label={`${used} of ${SLOTS} slots busy`}>
+              {Array.from({ length: SLOTS }, (_, i) => <i key={i} className={i < used ? 'on' : ''} />)}
+            </span>
+            <span className="dim">{used}/{SLOTS}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

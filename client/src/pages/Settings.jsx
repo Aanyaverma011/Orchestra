@@ -4,18 +4,6 @@ import { Moon, Sun, Rows3, Rows4, ShieldCheck, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import useTheme from '../hooks/useTheme';
 
-const SHORTCUTS = [
-  [['Ctrl', 'K'], 'Open the command palette'],
-  [['/'], 'Open the command palette'],
-  [['N'], 'Create a new job'],
-  [['G', 'O'], 'Go to Overview'],
-  [['G', 'J'], 'Go to Jobs'],
-  [['G', 'S'], 'Go to Schedules'],
-  [['G', 'D'], 'Go to Dead letters (admin)'],
-  [['G', 'W'], 'Go to Workers (admin)'],
-  [['Esc'], 'Close a drawer or dialog'],
-];
-
 export default function Settings() {
   const { user, isAdmin } = useAuth();
   const [theme, toggleTheme] = useTheme();
@@ -61,19 +49,7 @@ export default function Settings() {
         </div>
       </section>
 
-      <section className="panel">
-        <div className="panel-head"><h2>Keyboard shortcuts</h2><span className="sub">Work without leaving the keys</span></div>
-        <ul className="shortcuts">
-          {SHORTCUTS.map(([keys, what]) => (
-            <li key={what + keys.join()}>
-              <span>{what}</span>
-              <span>{keys.map((k, i) => <span key={k}><kbd>{k}</kbd>{i < keys.length - 1 && <em className="faint"> then </em>}</span>)}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <p className="muted" style={{ textAlign: 'center' }}>Want a tour of what Orchestra does? <Link to="/" style={{ color: 'var(--accent)' }}>Visit the home page</Link>.</p>
+      <p className="muted" style={{ textAlign: 'center' }}>Want a tour of what Orchestra does? <Link to="/" style={{ color: 'var(--accent-text)' }}>Visit the home page</Link>.</p>
     </div>
   );
 }

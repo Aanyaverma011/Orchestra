@@ -45,6 +45,11 @@ export function errorMessage(err, fallback = 'Something went wrong. Try again.')
   if (err?.response?.data?.issues?.length) return err.response.data.issues.map((i) => i.message).join('. ');
   if (err?.response?.data?.error) return err.response.data.error;
   if (err?.code === 'ERR_NETWORK') return 'Cannot reach the API. Check that the server is running.';
+  // A reply without our JSON error means something other than the Orchestra API answered.
+  const status = err?.response?.status;
+  if (status === 403) return 'Something other than the Orchestra API answered (403). On a Mac, port 5000 belongs to AirPlay Receiver: run the API on port 5050.';
+  if (status === 404) return 'The API route was not found. Check that the dashboard is pointed at the Orchestra server.';
+  if (status >= 500) return `The API server is not responding (error ${status}). Make sure the server, MongoDB and Redis are running.`;
   return fallback;
 }
 

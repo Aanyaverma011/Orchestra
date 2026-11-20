@@ -39,6 +39,9 @@ async function findByIdempotencyKey(userId, key, redisKey) {
   return null;
 }
 
+// Jobs that are waiting (not running) can be cancelled, including ones waiting to retry.
+const CANCELLABLE = ['queued', 'scheduled', 'retrying'];
+
 const isAdmin = (req) => req.user.role === 'admin';
 const ownerFilter = (req) => (isAdmin(req) ? {} : { createdBy: req.user.id });
 
@@ -140,18 +143,24 @@ async function cancelJob(req, res) {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Job not found' });
   const job = await Job.findOne({ _id: req.params.id, ...ownerFilter(req) });
   if (!job) return res.status(404).json({ error: 'Job not found' });
-  if (!['queued', 'scheduled'].includes(job.status)) {
-    return res.status(409).json({ error: `Cannot cancel a job that is ${job.status}` });
+  if (!CANCELLABLE.includes(job.status)) {
+    return res.status(409).json({ error: `This job is ${job.status} and can no longer be cancelled` });
   }
-  try {
-    const bullJob = await jobQueue.getJob(String(job._id));
-    if (bullJob) await bullJob.remove();
-  } catch {
-    return res.status(409).json({ error: 'Job was just picked up by a worker and can no longer be cancelled' });
+  const bullJob = await jobQueue.getJob(String(job._id));
+  if (bullJob) {
+    const state = await bullJob.getState();
+    if (state === 'active') {
+      return res.status(409).json({ error: 'A worker is running this job right now, so it can no longer be cancelled' });
+    }
+    try {
+      await bullJob.remove();
+    } catch {
+      return res.status(409).json({ error: 'A worker picked this job up a moment ago, so it can no longer be cancelled' });
+    }
   }
   job.status = 'cancelled';
   job.finishedAt = new Date();
-  job.logs.push({ level: 'warn', message: 'Cancelled by user' });
+  job.logs.push({ level: 'warn', message: `Cancelled by ${req.user.name || 'user'}` });
   await job.save();
   await invalidateStats();
   req.app.get('io')?.to(`user:${job.createdBy}`).to('admins').emit('job:update', { id: String(job._id), status: 'cancelled' });

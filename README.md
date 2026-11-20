@@ -1,586 +1,190 @@
 # Orchestra
-### Distributed Job Scheduling and Monitoring Platform
 
-Orchestra is a distributed background job processing and monitoring platform built with Node.js, Express, Redis, BullMQ and React. It allows users to submit jobs through a REST API while independent worker processes handle execution, retries and failure recovery.
+**A distributed job scheduling and monitoring platform.**
+An Express API accepts jobs and puts them on a Redis-backed BullMQ queue. Separate worker processes run them. A React dashboard shows every job moving through the pipeline in real time over Socket.io.
 
-A real-time dashboard powered by Socket.io provides visibility into job execution, queue activity, worker health and system performance.
+> Submitting a job returns in milliseconds. The slow work (emails, PDF reports, CSV processing) happens in the background, on workers you can scale independently.
 
-The system separates job submission from execution, allowing workers to process tasks independently and scale horizontally as workload increases.
+![Landing page](docs/screenshots/landing.png)
 
-<img width="1470" height="956" alt="Screenshot 2026-11-18 at 8 07 41 PM" src="https://github.com/user-attachments/assets/84702018-5a46-46a9-81f8-bed770df0ff9" />
+![Overview dashboard](docs/screenshots/overview.png)
 
-<img width="1470" height="956" alt="Screenshot 2026-11-18 at 8 08 26 PM" src="https://github.com/user-attachments/assets/57a1dcd4-cbc1-493a-8920-88c7b6a8e2c3" />
-
-<img width="1470" height="956" alt="Screenshot 2026-11-18 at 8 10 41 PM" src="https://github.com/user-attachments/assets/a5a18551-8316-4e22-b566-459a6e82da02" />
-
-## Live Deployment
-
-**Live Application:** [https://orchestra-aanya.duckdns.org/app](https://orchestra-aanya.duckdns.org/app)
-
-Orchestra is deployed and accessible through its live web application. Open the link above to explore the dashboard and experience its job management and monitoring features.
-
-### Dashboard Overview
-
-
-### Job Management
 <table>
   <tr>
-    <td width="50%">
-      <img src="docs/screenshots/job-details.png" alt="Job details and execution logs" width="100%">
-      <p align="center">Job Details</p>
-    </td>
-    <td width="50%">
-      <img src="docs/screenshots/create-job.png" alt="Create new job form" width="100%">
-      <p align="center">Create Job</p>
-    </td>
+    <td width="50%"><img src="docs/screenshots/job-details.png" alt="Job details drawer with failure explanation"></td>
+    <td width="50%"><img src="docs/screenshots/create-job.png" alt="Create job form with request preview"></td>
   </tr>
   <tr>
-    <td width="50%">
-      <img src="docs/screenshots/dead-letters.png" alt="Dead letter management" width="100%">
-      <p align="center">Dead Letters</p>
-    </td>
-    <td width="50%">
-      <img src="docs/screenshots/workers.png" alt="Worker monitoring dashboard" width="100%">
-      <p align="center">Worker Monitoring</p>
-    </td>
+    <td width="50%"><img src="docs/screenshots/dead-letters.png" alt="Dead letters page"></td>
+    <td width="50%"><img src="docs/screenshots/workers.png" alt="Workers page"></td>
   </tr>
 </table>
 
----
+## Quick start
 
-
-## Tech Stack
-
-| Category | Technologies |
-|---|---|
-| Frontend | React.js, Vite, CSS, Framer Motion |
-| Backend | Node.js, Express.js |
-| Database | MongoDB, Mongoose |
-| Queue Management | Redis, BullMQ |
-| Real-Time Communication | Socket.io |
-| Authentication | JWT, bcrypt |
-| Background Processing | Node.js Worker Processes |
-| AI Integration | Groq API |
-| Email Processing | Nodemailer |
-| Report Generation | PDFKit, CSV Processing |
-| Containerization | Docker, Docker Compose |
-| Testing | Jest, Supertest |
-| CI/CD | GitHub Actions |
-
-## Core Features
-
-### 1. Background Job Processing
-- Submit jobs through REST APIs without waiting for execution.
-- Process tasks asynchronously using Redis and BullMQ.
-- Support multiple job types, including email delivery, report generation and CSV processing.
-- Run independent worker processes to distribute background workloads.
-- Support job priorities, delayed execution and recurring jobs using cron expressions.
-
-### 2. Job Lifecycle Management
-- Track jobs through queued, processing, completed, retrying, dead and cancelled states.
-- Configure automatic retries with exponential backoff.
-- Move jobs to a dead-letter state after the configured attempts are exhausted.
-- Allow administrators to retry failed jobs.
-- Maintain job execution history, attempts and error logs.
-
-### 3. Worker Management and Scaling
-- Run multiple worker processes independently of the API server.
-- Monitor active workers and their processing activity.
-- View worker-level success rates and fleet information.
-- Increase processing capacity by scaling worker containers.
-- Recover stalled jobs when a worker unexpectedly terminates.
-
-### 4. Real-Time Monitoring
-- Live job status updates through Socket.io.
-- Dashboard statistics and queue health monitoring.
-- Job throughput and status distribution charts.
-- Real-time notifications for completed, failed and retried jobs.
-- Role-based Socket.io rooms to restrict event visibility.
-
-### 5. Authentication and Access Control
-- JWT-based authentication.
-- Password hashing with bcrypt.
-- Admin and Member roles.
-- Role-based authorization for protected operations.
-- Public registration cannot create administrator accounts.
-- Members can access their own jobs, while administrators can monitor all users' jobs.
-
-### 6. Reliability and Fault Tolerance
-- Automatic retry mechanism with exponential backoff.
-- Idempotency safeguards to reduce duplicate job creation and processing.
-- Redis-based atomic idempotency key management.
-- MongoDB unique indexes as an additional protection layer.
-- Stalled-job recovery through BullMQ.
-- Background sweeper to detect and re-enqueue jobs saved in MongoDB but not successfully added to the queue.
-- Rate limiting using Redis counters.
-
-### 7. AI-Powered Failure Explanation
-- Provides a simplified explanation of job execution errors.
-- Uses a Groq-hosted language model when an API key is configured.
-- Falls back to built-in error explanation rules when AI integration is unavailable.
-- Sends only relevant error information, job type, attempt counts and recent logs for explanation rather than the complete job payload.
-
-### 8. Dashboard and User Experience
-- Responsive landing page with an interactive job lifecycle explanation.
-- Dashboard with KPI cards, charts and queue statistics.
-- Command palette for quick navigation and job searching.
-- Notification center for job activity.
-- Bulk job cancellation and CSV export.
-- Job table density controls.
-- Profile and appearance settings.
-- Dark and light themes.
-- Keyboard shortcuts for frequently used actions.
-
----
-
-## Architecture
-
-Orchestra follows a producer-consumer architecture in which the API server handles job submission and independent workers perform the actual processing.
-
-```mermaid
-flowchart LR
-    UI[React Dashboard] -->|REST API| API[Express API]
-    UI <-->|Socket.io| API
-
-    API -->|Save Jobs| DB[(MongoDB)]
-    API -->|Enqueue Jobs| Q[(Redis + BullMQ)]
-
-    Q --> W1[Worker 1]
-    Q --> W2[Worker 2]
-    Q --> WN[Worker N]
-
-    W1 -->|Status and Logs| DB
-    W2 -->|Status and Logs| DB
-    WN -->|Status and Logs| DB
-
-    Q -. Queue Events .-> API
-```
-
-### Component Responsibilities
-
-| Component | Responsibility |
-|---|---|
-| React Client | User interface, job submission, monitoring and administration |
-| Express API | Authentication, validation, authorization, job creation and queue management |
-| BullMQ Workers | Background job execution and processing |
-| Redis | Queue storage, counters, idempotency and worker-related coordination |
-| MongoDB | Persistent storage of users, jobs, attempts, logs and errors |
-| Socket.io | Real-time communication between the server and connected clients |
-
-### Job Lifecycle
-
-A typical job follows this execution flow:
-
-```text
-Job Submission
-      |
-      v
-    Queued
-      |
-      v
-  Processing
-      |
-      +-----------> Completed
-      |
-      v
-   Retrying
-      |
-      v
-  Processing
-      |
-      v
-     Dead
-```
-
-Jobs can also be scheduled for future execution or cancelled while still queued.
-
-Failed jobs are retried according to the configured attempt count and exponential backoff policy. Jobs that exhaust their attempts are marked as dead and can be retried by an administrator.
-
----
-
-## Getting Started
-
-### Prerequisites
-
-Make sure the following tools are installed:
-
-- Node.js 22 or later
-- npm
-- Docker Desktop
-- Docker Compose
-
-Docker is the recommended way to run Orchestra because it starts the API, frontend, MongoDB, Redis and worker services together.
-
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/YOUR_USERNAME/Orchestra.git
-
-cd Orchestra
-```
-
-Replace `YOUR_USERNAME` with your GitHub username.
-
-### 2. Configure Environment Variables
-
-Copy the example environment file:
-
-```bash
-cp .env.example .env
-```
-
-The application provides development defaults for local execution.
-
-For production deployments, configure secure values for environment variables such as `JWT_SECRET` and any required API credentials.
-
-### 3. Start Using Docker Compose
-
-Build and start all services:
+Requires Docker.
 
 ```bash
 docker compose up --build
 ```
 
-To run everything in detached mode:
+Open **http://localhost:5173** for the home page, then choose **Try the live demo** or use **Admin demo** / **Member demo** on the sign-in page. The dashboard lives at `/app`.
 
-```bash
-docker compose up --build -d
-```
-
-### 4. Open the Application
-
-Visit:
-
-**http://localhost:5173**
-
-You can access the landing page and select the live demo or sign in using the demo accounts.
-
-The dashboard is available at:
-
-**http://localhost:5173/app**
-
-### Demo Accounts
-
-| Role | Email | Password |
-|---|---|---|
+| Account | Email | Password |
+| --- | --- | --- |
 | Admin | admin@orchestra.dev | Admin@123 |
 | Member | demo@orchestra.dev | Demo@1234 |
 
-These accounts are intended for local demonstration only and are created through the application's seed configuration.
+These are created on first start (`SEED_ON_START`). Change `JWT_SECRET` and turn seeding off for anything real.
 
-Do not use demo credentials or development secrets in a production environment.
+## Testing with several users and several workers
 
----
+- **Users and workers are different things.** A worker is a background process that runs jobs. Signing in never creates one. The default setup runs one worker, so "1 worker" is correct.
+- **More workers:** `docker compose up -d --scale worker=3`, then open Admin > Workers. Three cards appear.
+- **Several people at once:** each browser tab keeps its own login by default. Open one normal tab as Admin, a second tab (or another browser) as one member, a third as another member. All incognito windows share one session, so use a different browser profile or tab instead. Admin > Workers > *People signed in* lists everyone online.
+- **Starting clean:** sample jobs are off by default. If you ran an older version, remove old data once with `docker compose down -v`.
+- Admin sees every user's jobs in the totals, members see only their own.
 
-## Running Without Docker
+## Architecture
 
-If you prefer to run each service locally, install and start MongoDB and Redis first.
-
-### Terminal 1: Start the Backend API
-
-```bash
-cd server
-
-npm install
-
-cp .env.example .env
-
-npm run dev
+```mermaid
+flowchart LR
+  UI[React dashboard] -- REST --> API[Express API<br/>JWT, RBAC, rate limit, idempotency]
+  UI <-- Socket.io --> API
+  API -- save first --> DB[(MongoDB<br/>users, jobs, logs)]
+  API -- then enqueue --> Q[(Redis + BullMQ<br/>queue, cache, counters)]
+  Q --> W1[Worker 1]
+  Q --> W2[Worker 2]
+  Q --> WN[Worker N]
+  W1 & W2 & WN -- status, logs --> DB
+  Q -. QueueEvents .-> API
 ```
 
-### Terminal 2: Start the Worker
+| Part | Responsibility | Must not |
+| --- | --- | --- |
+| Client | Login, create jobs, live job table, charts, admin pages | Hold business rules |
+| API (`server/`) | Validate, authenticate, rate-limit, save the job, enqueue it, serve lists and stats, forward live events | Run the slow work |
+| Worker (`worker/`) | Pull jobs, run processors, write status and logs | Talk to browsers |
+| MongoDB | Permanent record: users, jobs, attempts, errors | Act as the queue |
+| Redis + BullMQ | Live queue, rate-limit counters, idempotency keys, cached stats, worker heartbeats | Be the only copy of history |
 
-Open another terminal:
+### Job lifecycle
 
-```bash
-cd worker
+`scheduled` or `queued` → `processing` → `completed`
+On error: `processing` → `retrying` (exponential backoff 2s, 4s, 8s) → `dead` after 4 attempts. An admin can retry a dead job; the retry switches off the *Simulate outage* flag and lets the admin correct a bad email address, so it does not just fail again. A queued, scheduled or retrying job can also be `cancelled`. If a worker dies mid-job, the job goes back to `queued` and another worker finishes it.
 
-npm install
+## What is implemented
 
-npm start
-```
+**Interface**
+- **Scrollable landing page** (`/`) with a self-running pipeline preview, animated counters, scroll reveals, an interactive job-lifecycle explainer, FAQ and call to action (Framer Motion).
+- **Dashboard** (`/app`): summary cards, live pipeline, throughput chart, jobs by status, recent jobs and a live activity feed. Sidebar badges for running and dead jobs, page transitions.
+- **Notification bell** that collects completed, failed and retried jobs in real time.
+- **Jobs page**: filters, search, CSV export of the current filter, compact or comfortable density. Open a job to see its log; queued, scheduled and retrying jobs can be cancelled from there.
+- **Dead letters**: fix the recipient and retry one job, or Retry all. **Workers**: fleet summary and per-worker success rate.
+- **Settings page** for profile, theme and table density.
 
-### Terminal 3: Start the Frontend
+- **Auth**: JWT, bcrypt, Admin and Member roles. Public sign-up can never create an admin.
+- **Three real job types**: send email (Nodemailer), generate report (PDF or CSV via PDFKit, downloadable), process CSV (streamed upload analysis).
+- **Reliability**: retries with exponential backoff, dead-letter page with a Retry button, stalled-job recovery when a worker dies, idempotent processors (an email is never sent twice).
+- **Idempotency keys**: the same `Idempotency-Key` header creates one job, even when several identical requests arrive at the same moment. Redis claims the key atomically (`SET NX`, 24 hours), and a unique MongoDB index is a second safety net.
+- **Rate limiting**: Redis counter per user per minute, then `429`.
+- **Priority, delayed and recurring (cron) jobs**. The Create job form has Now, Delay, At time and Repeat.
+- **Cache-aside stats**: dashboard numbers cached in Redis for 30 seconds, invalidated when jobs change state.
+- **Live dashboard**: Socket.io rooms, so a member only receives their own jobs and admins receive all.
+- **Failure explainer**: "Explain this failure" turns an error into two plain sentences. It uses a Groq model when `GROQ_API_KEY` is set and built-in rules otherwise. Only the job type, error text, attempt counts and recent log lines are ever sent, never the job payload.
+- **Outbox-style sweeper**: if the API saves a job but dies before queueing it, a background sweeper re-enqueues it.
+- **Tests and CI**: Jest and Supertest for the API, queue tests against a real Redis (including killing a worker mid-job), worker processor tests, and a GitHub Actions workflow with real MongoDB and Redis services.
 
-Open a third terminal:
+## Five-minute demo script
 
-```bash
-cd client
+1. **Overview.** Show the pipeline band and throughput chart. Say the one-line pitch.
+2. **Live status.** New job → Generate report (5,000 employees). Watch it go queued → processing → completed on the Jobs page, then download the PDF from the drawer.
+3. **Failure path.** New job → Send email → tick *Simulate an SMTP outage*. Watch it retry, then land in **Dead letters**. Open it, click **Explain this failure**, read the log, click **Retry job**. This time it completes, because retrying turns the simulated outage off.
+4. **Scaling.** In another terminal: `docker compose up -d --scale worker=3`. Submit 20 jobs. Open **Workers** (admin) and run `docker compose logs -f worker` to see different workers pick different jobs.
+5. **Crash recovery.** Start a long job (a report with 50,000 employees). Find a worker with `docker compose ps`, then `docker kill <that worker container>`. Another worker finishes the job after BullMQ's lock expires, about a minute with the default settings. The job log shows "The worker running this job stopped responding". Use `docker kill`, not `docker stop`: stop sends SIGTERM and the worker drains gracefully by design.
+6. **Idempotency.** Submit the form twice quickly. One job is created.
 
-npm install
+## Load test (your resume number)
 
-npm run dev
-```
-
-The frontend development server proxies API and Socket.io requests to the backend running on port 5000.
-
----
-
-## Testing
-
-Orchestra includes automated tests for the API, queue behavior and worker processors.
-
-### Backend API Tests
-
-```bash
-cd server
-
-npm test
-```
-
-Covers authentication, role-based access control, idempotency, rate limiting, cancellation, dead-letter retry, failure explanations and statistics caching.
-
-### Queue Integration Tests
-
-Start Redis locally, then run:
-
-```bash
-cd server
-
-npm run test:queue
-```
-
-Tests queue behavior against a real Redis instance, including:
-
-- Job retry and dead-letter transitions.
-- Priority and delayed jobs.
-- Duplicate job IDs.
-- Cron registration and invalid cron expressions.
-- Queue event handling.
-- Worker termination and stalled-job recovery.
-
-### Worker Tests
+The guide says to put only numbers you measured on your resume. This script measures them.
 
 ```bash
-cd worker
-
-npm test
-```
-
-Covers processor behavior, retry decisions, email idempotency safeguards, PDF and CSV generation, and path traversal protection.
-
-The API test suite uses `mongodb-memory-server`, which may download a MongoDB binary on its first execution.
-
-To use an existing MongoDB instance for tests, configure:
-
-```bash
-TEST_MONGO_URI=mongodb://localhost:27017
-```
-
----
-
-## Worker Scaling
-
-One of Orchestra's main design principles is separating API servers from background workers.
-
-You can scale workers independently without starting additional frontend or API instances.
-
-For example, start three worker containers:
-
-```bash
-docker compose up -d --scale worker=3
-```
-
-Open the Admin Dashboard and navigate to **Workers** to monitor the worker fleet.
-
-To inspect worker logs:
-
-```bash
-docker compose logs -f worker
-```
-
-To scale back to one worker:
-
-```bash
-docker compose up -d --scale worker=1
-```
-
----
-
-## Load Testing and Performance Benchmarking
-
-Orchestra includes a load-testing script to evaluate job submission latency, processing throughput and execution time.
-
-### Run the Benchmark
-
-Start the application with an increased rate limit and a shorter simulated processing delay:
-
-```bash
+# 1. Start with a high rate limit and a short simulated delay, one worker
 RATE_LIMIT_PER_MIN=100000 SIMULATE_WORK_MS=200 docker compose up -d --build --scale worker=1
-```
-
-Run the load test:
-
-```bash
 node scripts/loadtest.js --jobs 500 --work-ms 200
-```
 
-Repeat with three workers:
-
-```bash
+# 2. Repeat with three workers and compare
 RATE_LIMIT_PER_MIN=100000 SIMULATE_WORK_MS=200 docker compose up -d --scale worker=3
-```
-
-```bash
 node scripts/loadtest.js --jobs 500 --work-ms 200
 ```
 
-The script registers a test user, submits jobs through the API and waits for their completion. It reports API response times, total processing time, throughput and a benchmark summary.
+It registers its own user, submits the jobs through the real API, waits until all finish, and prints the API response times, total time, throughput and a resume line. Notes for honest reporting:
 
-Performance results depend on hardware, worker concurrency, database performance and job processing time. Run multiple tests and use measured results when reporting performance figures.
+- The result depends on your machine, on `SIMULATE_WORK_MS` (the pause inside every job) and on MongoDB speed. State the settings next to the number, as the printed resume line does.
+- Run it a few times and report a typical run. If three workers are not faster than one, look at CPU and MongoDB first, because every job makes several database writes.
+- Reaching `429` means the rate limit was not raised. Restart with `RATE_LIMIT_PER_MIN=100000`.
 
----
+## Running without Docker
+
+Needs Node 22, MongoDB and Redis running locally.
+
+> The API uses port **5050**, not 5000: on macOS, port 5000 belongs to AirPlay Receiver, which answers instead of the API and makes sign-in fail. If your old `server/.env` still says `PORT=5000`, change it to `PORT=5050`.
+
+```bash
+# terminal 1: API on port 5050 (copy server/.env.example to server/.env first)
+cd server && npm install && npm run dev
+# terminal 2: worker
+cd worker && npm install && npm start
+# terminal 3: dashboard (proxies /api and /socket.io to localhost:5050)
+cd client && npm install && npm run dev
+```
+
+## Tests
+
+```bash
+cd server && npm test          # API tests: auth, RBAC, idempotency (including a race), rate limit, cancel, dead-letter retry, explain, stats cache
+cd server && npm run test:queue   # queue behaviour against a real Redis on localhost:6379
+cd worker && npm test          # processors: retry decision, email idempotency, PDF/CSV output, path traversal
+```
+
+- The queue tests cover retry → dead after 4 attempts, priority order, delayed jobs, duplicate job ids, removing and re-queueing a failed job, QueueEvents ids, cron registration, rejection of an invalid cron expression, and **killing a worker with SIGKILL while it holds a job and watching another worker finish it**.
+- The API tests use `mongodb-memory-server` (downloads a MongoDB binary on first run). To use a MongoDB you already run instead, set `TEST_MONGO_URI=mongodb://localhost:27017`.
 
 ## Configuration
 
-Environment variables can be configured using `.env` in the project root.
+Copy `.env.example` to `.env` next to `docker-compose.yml` to change these. Every value has a working default.
 
-| Variable | Purpose |
-|---|---|
-| `JWT_SECRET` | Secret used for signing authentication tokens |
-| `RATE_LIMIT_PER_MIN` | Maximum job submissions per user per minute |
-| `SEED_ON_START` | Controls demo user creation |
-| `SEED_DEMO_DATA` | Controls sample history generation |
-| `GROQ_API_KEY` | Optional API key for AI-powered failure explanations |
-| `GROQ_MODEL` | Model used for failure explanations |
-| `WORKER_CONCURRENCY` | Number of jobs processed concurrently by each worker |
-| `MAIL_MODE` | Email processing mode, including JSON and Ethereal |
-| `SIMULATE_WORK_MS` | Simulated processing delay for demonstration and testing |
+| Variable | Default | Where | Purpose |
+| --- | --- | --- | --- |
+| `JWT_SECRET` | dev value | server | Signing key. Set a long random value. |
+| `RATE_LIMIT_PER_MIN` | 20 | server | Job submissions per user per minute |
+| `SEED_ON_START` / `SEED_DEMO_DATA` | true in Compose | server | Create demo users and sample history |
+| `GROQ_API_KEY` / `GROQ_MODEL` | empty | server | Optional AI failure summaries. Built-in rules are used without a key. |
+| `WORKER_CONCURRENCY` | 5 | worker | Jobs run at once per worker |
+| `MAIL_MODE` | `json` | worker | `ethereal` sends to a fake inbox and returns a preview link (needs internet) |
+| `SIMULATE_WORK_MS` | 1500 | worker | Pause inside processors so status changes are visible. Use 0 to 200 for load tests. |
 
-Refer to `.env.example` for the actual default values and additional environment configuration.
+## Design decisions and honest limitations
 
----
+- **Save to MongoDB first, then enqueue.** Nothing is lost if the queue call fails. The sweeper repairs the gap. A full outbox pattern would be the next step.
+- **At-least-once delivery.** Retries or crash recovery can run a job twice, so processors check saved progress before repeating side effects.
+- **No built-in dead-letter queue in BullMQ.** Orchestra marks a job `dead` once attempts are used up and lists those on its own page.
+- **Single Redis instance** is a single point of failure. Compose enables AOF persistence. Production would use a managed or replicated Redis.
+- **Multiple API servers** would need the Socket.io Redis adapter so events reach every connected client.
+- **Status in MongoDB and queue events can briefly disagree.** The dashboard shows the last event received and refetches to settle.
+- **Crash recovery takes about a minute** with BullMQ defaults (30 s lock, 30 s stalled check). Shorter values recover faster but risk false stalls when a job blocks the event loop.
+- **Stats use `$dateTrunc`**, which needs MongoDB 5.0 or newer (Compose uses 7). Some MongoDB-compatible services do not support it.
 
-## Useful Docker Commands
+## Structure
 
-| Command | Description |
-|---|---|
-| `docker compose up --build` | Build and start services |
-| `docker compose up -d` | Start services in the background |
-| `docker compose ps` | List running containers |
-| `docker compose logs -f` | Follow application logs |
-| `docker compose logs -f worker` | View worker logs |
-| `docker compose restart` | Restart services |
-| `docker compose down` | Stop and remove containers |
-| `docker compose down -v` | Stop services and remove persistent volumes |
-
-**Note:** Removing volumes deletes persistent MongoDB and Redis data.
-
----
-
-## Design Decisions and Limitations
-
-Some architectural decisions and trade-offs in Orchestra include:
-
-- **Database-first job creation:** Jobs are saved to MongoDB before being added to BullMQ. A background sweeper attempts to recover jobs that were saved but not successfully enqueued.
-- **At-least-once processing:** Jobs may be executed again after failures or worker crashes. Idempotency safeguards help reduce duplicate side effects.
-- **Application-managed dead letters:** Orchestra maintains its own dead-job state and management interface instead of relying on a separate BullMQ dead-letter queue.
-- **Redis availability:** The current setup uses a single Redis instance, making Redis a potential single point of failure.
-- **Multiple API instances:** A Redis adapter for Socket.io would be needed to distribute real-time events across multiple API instances.
-- **Event synchronization:** MongoDB job states and queue events may briefly differ. The dashboard refetches data to reconcile its displayed state.
-- **Stalled-job recovery:** Recovery time depends on BullMQ lock duration and stalled-job detection settings.
-- **MongoDB compatibility:** Dashboard statistics use `$dateTrunc`, which requires MongoDB 5.0 or later.
-
-These are important considerations for scaling the application toward a production deployment.
-
----
-
-## Project Structure
-
-```text
-Orchestra/
-│
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-│
-├── client/
-│   ├── src/
-│   ├── public/
-│   ├── package.json
-│   └── Dockerfile
-│
-├── server/
-│   ├── controllers/
-│   ├── routes/
-│   ├── middleware/
-│   ├── models/
-│   ├── services/
-│   ├── tests/
-│   └── package.json
-│
-├── worker/
-│   ├── processors/
-│   ├── tests/
-│   ├── package.json
-│   └── Dockerfile
-│
-├── scripts/
-│   └── loadtest.js
-│
-├── docs/
-│   └── screenshots/
-│
-├── .env.example
-├── .gitignore
-├── docker-compose.yml
-└── README.md
 ```
-
-*The structure above illustrates the main project components. Individual folders may contain additional files and modules.*
-
----
-
-## CI/CD
-
-The project uses GitHub Actions to automate testing and build verification.
-
-The CI workflow runs separate jobs for:
-
-- Backend API tests with MongoDB and Redis services.
-- Queue integration tests.
-- Worker processor tests.
-- Frontend production build verification.
-- Load-test script syntax validation.
-
-Workflow configuration:
-
-```text
-.github/workflows/ci.yml
+orchestra/
+  docker-compose.yml
+  .env.example
+  scripts/loadtest.js     load test for your resume number
+  docs/screenshots/       images used above
+  client/   React + Vite dashboard (Source Sans 3 and Source Serif 4, design tokens, dark and light themes)
+  server/   Express API: routes, controllers, middleware, queue producer, sockets, sweeper, explain service, tests
+  worker/   BullMQ worker and processors (email, report, csv), tests
+  .github/  CI workflow
 ```
-
-This helps catch integration issues and build failures whenever changes are pushed or pull requests are opened.
-
----
-
-## Demo Walkthrough
-
-The following sequence demonstrates the main capabilities of Orchestra.
-
-1. **Dashboard Overview:** Explore job statistics, queue health, throughput and worker activity.
-2. **Submit a Job:** Create a report-generation job and observe its lifecycle in real time.
-3. **Failure Handling:** Simulate an SMTP failure, observe retries and inspect the dead-letter entry.
-4. **Failure Explanation:** Use the failure explanation feature to understand the error.
-5. **Worker Scaling:** Start additional workers and submit multiple jobs to observe distributed processing.
-6. **Crash Recovery:** Terminate a worker unexpectedly and observe BullMQ's stalled-job recovery.
-7. **Idempotency:** Submit requests with the same idempotency key and verify that duplicate job creation is prevented.
-
----
-
-## Future Improvements
-
-Potential improvements for future versions include:
-
-- Distributed Socket.io scaling using Redis adapters.
-- More advanced queue analytics and observability.
-- Enhanced worker health checks and alerting.
-- Production-grade Redis high availability.
-- More configurable retry and scheduling policies.
-- Improved deployment automation and monitoring.
-
----
-
-**Orchestra** — Reliable background processing, independent workers and real-time job visibility.
-
-Author- Aanya Verma
-Linkdin- https://www.linkedin.com/in/aanya-verma-74a1872a3/

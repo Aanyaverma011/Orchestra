@@ -1,28 +1,40 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion, useInView, useScroll, useSpring } from 'framer-motion';
-import {
-  ArrowRight, BellRing, CalendarClock, ChevronDown, Database, Gauge, KeyRound, LayoutDashboard, Menu, Moon,
-  Monitor, Play, Repeat, ShieldCheck, Skull, Sparkles, Sun, Server, Cpu, X, Zap,
-} from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowRight, ChevronDown, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Logo } from '../components/atoms';
 import LiveDemo from '../components/landing/LiveDemo';
+import SiteFooter from '../components/SiteFooter';
 import Lifecycle from '../components/landing/Lifecycle';
-import useCountUp from '../hooks/useCountUp';
-import useTheme from '../hooks/useTheme';
+import { useLightTheme } from '../hooks/useTheme';
 
 const NAV = [['Features', '#features'], ['How it works', '#how'], ['Lifecycle', '#lifecycle'], ['Architecture', '#architecture'], ['FAQ', '#faq']];
 
+const METRICS = [['3', 'job types built in'], ['4', 'attempts before a job is dead'], ['30s', 'dashboard stats cache'], ['2', 'roles: member and admin']];
+
+const STEPS = [
+  ['1', 'Submit', 'Send a job with a type, a priority and an optional delay or schedule.'],
+  ['2', 'Queue', 'It is saved first, then queued, so a crash never loses work.'],
+  ['3', 'Process', 'A worker runs it, writes logs and progress, and reports back live.'],
+];
+
 const FEATURES = [
-  { icon: Zap, title: 'Instant submit, slow work in the background', text: 'The API saves your job and answers right away. Emails, PDFs and CSV imports run on workers, so nobody waits on a spinner.', span: 'wide', tag: 'Fast' },
-  { icon: Repeat, title: 'Retries with backoff', text: 'Failed attempts retry after 2, 4 and 8 seconds before a job is marked dead.', tag: 'Reliable' },
-  { icon: Skull, title: 'Dead-letter inbox', text: 'Read the last error, then retry in one click.', tag: 'Recoverable' },
-  { icon: CalendarClock, title: 'Delayed and recurring jobs', text: 'Run now, after a delay, at a set time or on a cron schedule.', tag: 'Scheduling' },
-  { icon: Gauge, title: 'Priorities that matter', text: 'High priority jobs jump ahead of low priority ones in the same queue.', tag: 'Control' },
-  { icon: KeyRound, title: 'Idempotency keys', text: 'A double-click or a network retry creates one job, never two. Emails are never sent twice.', tag: 'Safe', span: 'wide' },
-  { icon: ShieldCheck, title: 'Roles and private data', text: 'Members see their own jobs. Admins see everything and manage workers.', tag: 'Secure', span: 'wide' },
-  { icon: Sparkles, title: 'Plain-language failure explainer', text: 'Turns a stack of error text into two sentences you can act on. Your job payload is never sent.', tag: 'Helpful', span: 'wide' },
+  ['Instant submit, slow work in the background.', 'The API saves your job and answers right away. Emails, PDFs and CSV imports run on workers, so nobody waits on a spinner.'],
+  ['Retries with backoff.', 'Failed attempts retry after 2, 4 and 8 seconds before a job is marked dead.'],
+  ['Dead-letter inbox.', 'Read the last error, then retry in one click.'],
+  ['Delayed and recurring jobs.', 'Run now, after a delay, at a set time or on a cron schedule.'],
+  ['Priorities that matter.', 'High priority jobs jump ahead of low priority ones in the same queue.'],
+  ['Idempotency keys.', 'A double-click or a network retry creates one job, never two. Emails are never sent twice.'],
+  ['Roles and private data.', 'Members see their own jobs. Admins see everything and manage workers.'],
+  ['Plain-language failure explainer.', 'Turns a stack of error text into two sentences you can act on. Your job payload is never sent.'],
+];
+
+const ARCH = [
+  ['Dashboard', 'Live view and controls'],
+  ['API', 'Auth, validation, enqueue'],
+  ['Queue and database', 'Fast queue, permanent history'],
+  ['Workers', 'Run jobs, scale freely'],
 ];
 
 const FAQ = [
@@ -33,36 +45,11 @@ const FAQ = [
   ['Do I need to set anything up to try it?', 'No. Use the demo buttons on the sign-in page to explore as a member or as an admin.'],
 ];
 
-const reveal = { hidden: { opacity: 0, y: 28 }, show: (i = 0) => ({ opacity: 1, y: 0, transition: { duration: 0.6, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] } }) };
-
-function Reveal({ children, i = 0, className = '', as = 'div', ...rest }) {
+// Sections below the hero fade in once as you scroll. Nothing at the top moves.
+const reveal = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } } };
+function Reveal({ children, className = '', as = 'div' }) {
   const Tag = motion[as];
-  return (
-    <Tag className={className} variants={reveal} custom={i} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-80px' }} {...rest}>
-      {children}
-    </Tag>
-  );
-}
-
-function Counter({ to, suffix = '', prefix = '', label }) {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: '-40px' });
-  const v = useCountUp(inView ? to : 0, { duration: 1400 });
-  return (
-    <div ref={ref} className="lp-metric">
-      <b className="num">{prefix}{v}{suffix}</b>
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function Spotlight({ children, className = '' }) {
-  const onMove = (e) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    e.currentTarget.style.setProperty('--mx', `${e.clientX - r.left}px`);
-    e.currentTarget.style.setProperty('--my', `${e.clientY - r.top}px`);
-  };
-  return <div className={`spot ${className}`} onMouseMove={onMove}>{children}</div>;
+  return <Tag className={className} variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-60px' }}>{children}</Tag>;
 }
 
 function Faq() {
@@ -73,11 +60,11 @@ function Faq() {
         <div key={q} className={`faq-item ${open === i ? 'open' : ''}`}>
           <button onClick={() => setOpen(open === i ? -1 : i)} aria-expanded={open === i}>
             {q}
-            <ChevronDown size={18} />
+            <ChevronDown size={16} />
           </button>
           <AnimatePresence initial={false}>
             {open === i && (
-              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }} style={{ overflow: 'hidden' }}>
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} style={{ overflow: 'hidden' }}>
                 <p>{a}</p>
               </motion.div>
             )}
@@ -88,15 +75,24 @@ function Faq() {
   );
 }
 
+function SectionHead({ label, title, children }) {
+  return (
+    <div className="lp-head">
+      <span className="lp-label">{label}</span>
+      <h2>{title}</h2>
+      {children && <p>{children}</p>}
+    </div>
+  );
+}
+
 export default function Landing() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
-  const [theme, toggleTheme] = useTheme();
+  useLightTheme();
   const [menu, setMenu] = useState(false);
   const [busy, setBusy] = useState(false);
-  const { scrollYProgress } = useScroll();
-  const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 24, mass: 0.3 });
 
+  // Signs in to the seeded member account and opens the dashboard.
   const tryDemo = async () => {
     if (user) return navigate('/app');
     setBusy(true);
@@ -118,200 +114,146 @@ export default function Landing() {
 
   return (
     <div className="lp">
-      <motion.div className="lp-progress" style={{ scaleX: progress }} />
-
       <header className="lp-nav">
         <div className="lp-wrap lp-nav-in">
-          <a href="#top" className="brand" onClick={(e) => go(e, '#top')}><Logo />Orchestra</a>
+          <a href="#top" className="lp-brand" onClick={(e) => go(e, '#top')}><Logo size={22} />Orchestra</a>
           <nav className={`lp-links ${menu ? 'open' : ''}`} aria-label="Sections">
             {NAV.map(([label, href]) => <a key={href} href={href} onClick={(e) => go(e, href)}>{label}</a>)}
           </nav>
           <div className="lp-nav-actions">
-            <button className="btn ghost icon" onClick={toggleTheme} aria-label="Toggle theme">{theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}</button>
             {user ? (
-              <Link to="/app" className="btn primary"><LayoutDashboard size={16} /> Open dashboard</Link>
+              <Link to="/app" className="lp-btn primary">Open dashboard</Link>
             ) : (
               <>
-                <Link to="/login" className="btn ghost lp-hide-sm">Sign in</Link>
-                <Link to="/login" className="btn primary lp-hide-xs">Get started <ArrowRight size={15} /></Link>
+                <Link to="/login" className="lp-btn ghost lp-hide-sm">Sign in</Link>
+                <Link to="/login" className="lp-btn primary">Get started <ArrowRight size={15} /></Link>
               </>
             )}
-            <button className="btn ghost icon lp-burger" onClick={() => setMenu((m) => !m)} aria-label="Menu">{menu ? <X size={18} /> : <Menu size={18} />}</button>
+            <button className="lp-icon lp-burger" onClick={() => setMenu((m) => !m)} aria-label="Menu">{menu ? <X size={16} /> : <Menu size={16} />}</button>
           </div>
         </div>
       </header>
 
       <main id="top">
-        {/* ───────── Hero ───────── */}
         <section className="lp-hero">
-          <div className="lp-bg" aria-hidden="true"><span className="orb o1" /><span className="orb o2" /><span className="grid-bg" /></div>
           <div className="lp-wrap lp-hero-in">
             <div className="lp-hero-copy">
-              <motion.span className="lp-eyebrow" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                <i /> Job scheduling with a live dashboard
-              </motion.span>
-              <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}>
-                Run background work <em>without making anyone wait</em>
-              </motion.h1>
-              <motion.p className="lp-lede" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18, duration: 0.7 }}>
+              <p className="lp-eyebrow">Job scheduling with a live dashboard</p>
+              <h1>Run background work without making anyone wait</h1>
+              <p className="lp-lede">
                 Submit a job and move on. Watch it travel from queued to completed, retry what fails, and add workers whenever you need more speed.
-              </motion.p>
-              <motion.div className="lp-cta" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28, duration: 0.7 }}>
-                <button className="btn primary lg" onClick={tryDemo} disabled={busy}><Play size={16} /> {busy ? 'Opening…' : user ? 'Open dashboard' : 'Try the live demo'}</button>
-                <a href="#how" className="btn lg" onClick={(e) => go(e, '#how')}>See how it works</a>
-              </motion.div>
-              <motion.ul className="lp-points" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
+              </p>
+              <div className="lp-cta">
+                <button className="lp-btn primary lg" onClick={tryDemo} disabled={busy}>{busy ? 'Opening…' : user ? 'Open dashboard' : 'Try the live demo'}</button>
+                <a href="#how" className="lp-btn lg" onClick={(e) => go(e, '#how')}>See how it works</a>
+              </div>
+              <ul className="lp-points">
                 <li>No setup needed for the demo</li>
                 <li>Member and admin views</li>
                 <li>Light and dark themes</li>
-              </motion.ul>
+              </ul>
             </div>
-            <motion.div className="lp-hero-art" initial={{ opacity: 0, y: 40, rotateX: 8 }} animate={{ opacity: 1, y: 0, rotateX: 0 }} transition={{ delay: 0.25, duration: 0.9, ease: [0.22, 1, 0.36, 1] }}>
+            <div className="lp-hero-art">
               <LiveDemo />
-              <motion.div className="float f1" animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 5, ease: 'easeInOut' }}>
-                <BellRing size={15} /> Report ready to download
-              </motion.div>
-              <motion.div className="float f2" animate={{ y: [0, 9, 0] }} transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut', delay: 0.6 }}>
-                <Repeat size={15} /> Retry 2 of 4 in 4s
-              </motion.div>
-            </motion.div>
+              <p className="lp-caption">The overview page with three workers running. Click the tabs to filter.</p>
+            </div>
           </div>
         </section>
 
-        {/* ───────── Metrics ───────── */}
         <section className="lp-wrap">
-          <Reveal className="lp-metrics">
-            <Counter to={3} label="job types built in" />
-            <Counter to={4} label="attempts before a job is dead" />
-            <Counter to={30} suffix="s" label="dashboard stats cache" />
-            <Counter to={2} label="roles: member and admin" />
-          </Reveal>
+          <dl className="lp-metrics">
+            {METRICS.map(([n, label]) => (
+              <div key={label}><dt>{n}</dt><dd>{label}</dd></div>
+            ))}
+          </dl>
         </section>
 
-        {/* ───────── How it works ───────── */}
         <section className="lp-sec" id="how">
           <div className="lp-wrap">
-            <Reveal className="lp-head">
-              <span className="kicker">How it works</span>
-              <h2>Three steps from request to result</h2>
-              <p>Your app stays quick because it only decides what to run. Separate workers do the heavy lifting.</p>
-            </Reveal>
+            <SectionHead label="How it works" title="Three steps from request to result">
+              Your app stays quick because it only decides what to run. Separate workers do the heavy lifting.
+            </SectionHead>
             <div className="lp-how">
-              <div className="how-steps">
-                {[
-                  ['1', 'Submit', 'Send a job with a type, a priority and an optional delay or schedule.', Zap],
-                  ['2', 'Queue', 'It is saved first, then queued, so a crash never loses work.', Database],
-                  ['3', 'Process', 'A worker runs it, writes logs and progress, and reports back live.', Cpu],
-                ].map(([n, t, d, Icon], i) => (
-                  <Reveal key={n} i={i} className="how-step">
+              <ol className="how-steps">
+                {STEPS.map(([n, t, d]) => (
+                  <li key={n} className="how-step">
                     <span className="how-n">{n}</span>
-                    <div><b><Icon size={16} /> {t}</b><p>{d}</p></div>
-                  </Reveal>
+                    <div><b>{t}</b><p>{d}</p></div>
+                  </li>
                 ))}
-              </div>
-              <Reveal i={1} className="codecard">
-                <div className="code-bar"><i /><i /><i /><span className="mono">request</span></div>
+              </ol>
+              <Reveal className="codecard">
+                <div className="code-bar"><span>request</span></div>
                 <pre className="mono"><span className="c-m">POST</span> /api/jobs{'\n'}<span className="c-k">Idempotency-Key:</span> 7f3c-e21a{'\n\n'}{'{'}{'\n'}  <span className="c-k">"type"</span>: <span className="c-s">"generate-report"</span>,{'\n'}  <span className="c-k">"priority"</span>: <span className="c-s">"high"</span>,{'\n'}  <span className="c-k">"delay"</span>: <span className="c-s">"5m"</span>{'\n'}{'}'}</pre>
-                <div className="code-res"><span className="pill" data-status="completed"><i />202 Accepted</span><span className="muted">returned before the work even starts</span></div>
+                <div className="code-res"><b className="c-ok">202 Accepted</b><span className="muted">returned before the work even starts</span></div>
               </Reveal>
             </div>
           </div>
         </section>
 
-        {/* ───────── Features ───────── */}
         <section className="lp-sec" id="features">
           <div className="lp-wrap">
-            <Reveal className="lp-head">
-              <span className="kicker">Features</span>
-              <h2>Everything a real queue needs, nothing it does not</h2>
-              <p>Reliability, control and visibility in one place.</p>
+            <SectionHead label="Features" title="Everything a real queue needs, nothing it does not">
+              Reliability, control and visibility in one place.
+            </SectionHead>
+            <Reveal className="does">
+              <ul className="does-list">
+                {FEATURES.map(([lead, rest]) => (
+                  <li key={lead}><b>{lead}</b> {rest}</li>
+                ))}
+              </ul>
             </Reveal>
-            <div className="bento">
-              {FEATURES.map((f, i) => {
-                const Icon = f.icon;
-                return (
-                  <Reveal key={f.title} i={i % 3} className={`bento-cell ${f.span || ''}`}>
-                    <Spotlight className="bento-card">
-                      <span className="bento-tag">{f.tag}</span>
-                      <span className="bento-ico"><Icon size={20} /></span>
-                      <h3>{f.title}</h3>
-                      <p>{f.text}</p>
-                    </Spotlight>
-                  </Reveal>
-                );
-              })}
-            </div>
           </div>
         </section>
 
-        {/* ───────── Lifecycle ───────── */}
         <section className="lp-sec" id="lifecycle">
           <div className="lp-wrap">
-            <Reveal className="lp-head">
-              <span className="kicker">Lifecycle</span>
-              <h2>Follow a job from start to finish</h2>
-              <p>Switch scenarios to see what happens when everything works, and when it does not.</p>
-            </Reveal>
-            <Reveal className="panel life-panel"><Lifecycle /></Reveal>
+            <SectionHead label="Lifecycle" title="Follow a job from start to finish">
+              Switch scenarios to see what happens when everything works, and when it does not.
+            </SectionHead>
+            <Reveal className="life-panel"><Lifecycle /></Reveal>
           </div>
         </section>
 
-        {/* ───────── Architecture ───────── */}
         <section className="lp-sec" id="architecture">
           <div className="lp-wrap">
-            <Reveal className="lp-head">
-              <span className="kicker">Architecture</span>
-              <h2>Each part does one job well</h2>
-              <p>The browser never talks to workers, and workers never block the API.</p>
-            </Reveal>
+            <SectionHead label="Architecture" title="Each part does one job well">
+              The browser never talks to workers, and workers never block the API.
+            </SectionHead>
             <Reveal className="arch">
-              {[
-                [Monitor, 'Dashboard', 'Live view and controls'],
-                [Server, 'API', 'Auth, validation, enqueue'],
-                [Database, 'Queue and database', 'Fast queue, permanent history'],
-                [Cpu, 'Workers', 'Run jobs, scale freely'],
-              ].map(([Icon, t, d], i, arr) => (
-                <div key={t} className="arch-item">
-                  <div className="arch-node"><span><Icon size={20} /></span><b>{t}</b><small>{d}</small></div>
-                  {i < arr.length - 1 && <span className="arch-link"><u /></span>}
+              {ARCH.map(([t, d], i) => (
+                <div key={t} className="arch-node">
+                  <span className="arch-i">{String(i + 1).padStart(2, '0')}</span>
+                  <b>{t}</b>
+                  <small>{d}</small>
                 </div>
               ))}
             </Reveal>
           </div>
         </section>
 
-        {/* ───────── FAQ ───────── */}
         <section className="lp-sec" id="faq">
-          <div className="lp-wrap narrow">
-            <Reveal className="lp-head">
-              <span className="kicker">FAQ</span>
-              <h2>Questions, answered</h2>
-            </Reveal>
+          <div className="lp-wrap">
+            <SectionHead label="FAQ" title="Questions, answered" />
             <Reveal><Faq /></Reveal>
           </div>
         </section>
 
-        {/* ───────── CTA ───────── */}
         <section className="lp-wrap">
-          <Reveal className="lp-final">
-            <span className="orb o3" aria-hidden="true" />
-            <h2>See your queue move in real time</h2>
-            <p>Open the demo workspace and submit your first job in under a minute.</p>
-            <div className="lp-cta" style={{ justifyContent: 'center' }}>
-              <button className="btn primary lg" onClick={tryDemo} disabled={busy}><Play size={16} /> {user ? 'Open dashboard' : 'Try the live demo'}</button>
-              {!user && <Link to="/login" className="btn lg">Create an account</Link>}
+          <div className="lp-final">
+            <div>
+              <h2>See your queue move in real time</h2>
+              <p>Open the demo workspace and submit your first job in under a minute.</p>
             </div>
-          </Reveal>
+            <div className="lp-cta">
+              <button className="lp-btn primary lg" onClick={tryDemo} disabled={busy}>{user ? 'Open dashboard' : 'Try the live demo'}</button>
+              {!user && <Link to="/login" className="lp-btn lg">Create an account</Link>}
+            </div>
+          </div>
         </section>
       </main>
 
-      <footer className="lp-foot">
-        <div className="lp-wrap lp-foot-in">
-          <span className="brand"><Logo size={24} />Orchestra</span>
-          <span className="muted">Distributed job scheduling and monitoring.</span>
-          <nav>{NAV.slice(0, 4).map(([l, h]) => <a key={h} href={h} onClick={(e) => go(e, h)}>{l}</a>)}</nav>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

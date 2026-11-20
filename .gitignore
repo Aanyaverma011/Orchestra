@@ -6,16 +6,3 @@ data/
 coverage/
 *.log
 .DS_Store
-                                                                                                                        
-.env.*
-!.env.example
-
-
-build/
-npm-debug.log*
-.vscode/
-.idea/
-
-
-*.tmp
-*.bak

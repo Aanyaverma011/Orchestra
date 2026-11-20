@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LayoutDashboard, ListChecks, PlusCircle, CalendarClock, Skull, Cpu, LogOut, Sun, Moon, Menu, Search, PanelLeftClose, PanelLeftOpen, Settings as SettingsIcon } from 'lucide-react';
+import { LayoutDashboard, ListChecks, Plus, PlusCircle, CalendarClock, Skull, Cpu, LogOut, Sun, Moon, Menu, Settings as SettingsIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLive } from '../context/LiveContext';
 import { Logo } from './atoms';
-import CommandPalette from './CommandPalette';
 import NotificationBell from './NotificationBell';
 import useTheme from '../hooks/useTheme';
 import api from '../api';
@@ -17,7 +16,7 @@ const TITLES = {
   '/app/schedules': ['Schedules', 'Recurring jobs'],
   '/app/dead-letter': ['Dead letters', 'Jobs that failed every attempt'],
   '/app/workers': ['Workers', 'Processes consuming the queue'],
-  '/app/settings': ['Settings', 'Appearance and shortcuts'],
+  '/app/settings': ['Settings', 'Profile and appearance'],
 };
 
 const pref = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
@@ -27,8 +26,6 @@ export default function Shell() {
   const { connected } = useLive();
   const [theme, toggleTheme] = useTheme();
   const [open, setOpen] = useState(false);
-  const [cmd, setCmd] = useState(false);
-  const [collapsed, setCollapsed] = useState(() => pref('orchestra-collapsed', '0') === '1');
   const [stats, setStats] = useState(null);
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -40,11 +37,6 @@ export default function Shell() {
   useEffect(() => setOpen(false), [pathname]);
   useEffect(() => { document.title = `${title} · Orchestra`; }, [title]);
 
-  const toggleCollapsed = () => setCollapsed((c) => {
-    try { localStorage.setItem('orchestra-collapsed', c ? '0' : '1'); } catch { /* ignore */ }
-    return !c;
-  });
-
   // Worker heartbeat count and queue badges for the sidebar.
   useEffect(() => {
     let alive = true;
@@ -54,36 +46,13 @@ export default function Shell() {
     return () => { alive = false; clearInterval(t); };
   }, []);
 
-  // Keyboard: Ctrl/Cmd+K opens the palette. "N" and "G then letter" are quick navigation.
-  const handleKey = useCallback((e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setCmd((c) => !c); return; }
-    const t = e.target;
-    if (e.metaKey || e.ctrlKey || e.altKey || t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
-    if (e.key === 'n') { navigate('/app/jobs/new'); return; }
-    if (e.key === '/') { e.preventDefault(); setCmd(true); return; }
-    if (e.key === 'g') {
-      const next = (ev) => {
-        window.removeEventListener('keydown', next, true);
-        const map = { o: '/app', j: '/app/jobs', s: '/app/schedules', ...(isAdmin ? { d: '/app/dead-letter', w: '/app/workers' } : {}) };
-        if (map[ev.key]) { ev.preventDefault(); navigate(map[ev.key]); }
-      };
-      window.addEventListener('keydown', next, true);
-      setTimeout(() => window.removeEventListener('keydown', next, true), 1200);
-    }
-  }, [navigate, isAdmin]);
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [handleKey]);
-
   const initials = (user?.name || '?').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
   const inFlight = stats?.inFlight || 0;
   const dead = stats?.byStatus?.dead || 0;
   const workers = stats?.workers;
 
   const link = (to, Icon, label, { end = false, badge, tone } = {}) => (
-    <NavLink to={to} end={end} title={collapsed ? label : undefined}>
+    <NavLink to={to} end={end}>
       <Icon size={18} />
       <span className="nav-label">{label}</span>
       {badge > 0 && <em className={`count ${tone || ''}`}>{badge > 99 ? '99+' : badge}</em>}
@@ -91,14 +60,11 @@ export default function Shell() {
   );
 
   return (
-    <div className={`shell ${collapsed ? 'collapsed' : ''}`}>
+    <div className="shell">
       <aside className={`sidebar ${open ? 'open' : ''}`} aria-label="Primary">
         <div className="brand">
           <Logo />
-          <span className="nav-label">Orchestra</span>
-          <button className="btn ghost icon sm collapse-btn" onClick={toggleCollapsed} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-            {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-          </button>
+          <span>Orchestra</span>
         </div>
         <nav className="nav">
           <div className="nav-group">Workspace</div>
@@ -141,26 +107,19 @@ export default function Shell() {
             <span className="sub">{sub}</span>
           </div>
           <span className="spacer" />
-          <button className="cmd-trigger" onClick={() => setCmd(true)} aria-label="Open command palette">
-            <Search size={15} /> <span>Search or jump to…</span> <kbd>Ctrl K</kbd>
-          </button>
-          <span className={`live ${connected ? 'on' : ''}`} title={connected ? 'Receiving live updates' : 'Reconnecting to live updates'}>
-            <i /> <span>{connected ? 'Live' : 'Reconnecting'}</span>
-          </span>
           <NotificationBell />
           <button className="btn ghost icon" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
           </button>
-          <button className="btn primary" onClick={() => navigate('/app/jobs/new')}><PlusCircle size={16} /> <span className="hide-sm">New job</span></button>
+          {pathname !== '/app/jobs/new' && <button className="btn primary" onClick={() => navigate('/app/jobs/new')}><Plus size={16} /> <span className="hide-sm">New job</span></button>}
         </header>
         <main className="page">
-          <motion.div key={pathname} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}>
+          <motion.div key={pathname} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: 'easeOut' }}>
             <Outlet />
           </motion.div>
         </main>
       </div>
       {open && <div className="scrim" style={{ zIndex: 45 }} onClick={() => setOpen(false)} />}
-      <CommandPalette open={cmd} onClose={() => setCmd(false)} isAdmin={isAdmin} theme={theme} toggleTheme={toggleTheme} logout={logout} />
     </div>
   );
 }

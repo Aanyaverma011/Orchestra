@@ -11,6 +11,7 @@ import Schedules from './pages/Schedules';
 import DeadLetter from './pages/DeadLetter';
 import Workers from './pages/Workers';
 import Settings from './pages/Settings';
+import Info, { INFO_PAGES } from './pages/Info';
 
 function Protected({ children, admin = false }) {
   const { user, loading, isAdmin } = useAuth();
@@ -25,6 +26,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
+      {INFO_PAGES.map((p) => <Route key={p} path={`/${p}`} element={<Info page={p} />} />)}
       <Route
         path="/app"
         element={

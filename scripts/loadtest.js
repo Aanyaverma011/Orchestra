@@ -5,7 +5,7 @@
  * Needs Node 18+ (built-in fetch). No dependencies.
  *
  *   node scripts/loadtest.js --jobs 500
- *   node scripts/loadtest.js --jobs 500 --url http://localhost:5000 --type generate-report
+ *   node scripts/loadtest.js --jobs 500 --url http://localhost:5050 --type generate-report
  *
  * Before running, start the stack with a high rate limit and a short simulated delay:
  *   RATE_LIMIT_PER_MIN=100000 SIMULATE_WORK_MS=200 docker compose up -d --build --scale worker=1
@@ -20,12 +20,12 @@ const args = Object.fromEntries(
 );
 
 if (args.help) {
-  console.log('Usage: node scripts/loadtest.js [--jobs 500] [--url http://localhost:5000] [--type send-email|generate-report] [--concurrency 20] [--timeout 600] [--work-ms 200] [--workers 3]');
+  console.log('Usage: node scripts/loadtest.js [--jobs 500] [--url http://localhost:5050] [--type send-email|generate-report] [--concurrency 20] [--timeout 600] [--work-ms 200] [--workers 3]');
   process.exit(0);
 }
 
 const N = Number(args.jobs || 500);
-const BASE = (args.url || 'http://localhost:5000').replace(/\/$/, '');
+const BASE = (args.url || 'http://localhost:5050').replace(/\/$/, '');
 const TYPE = args.type || 'send-email';
 const SUBMIT_CONCURRENCY = Number(args.concurrency || 20);
 const TIMEOUT_S = Number(args.timeout || 600);

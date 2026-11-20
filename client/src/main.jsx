@@ -1,8 +1,13 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import '@fontsource-variable/instrument-sans';
-import '@fontsource-variable/jetbrains-mono';
+import '@fontsource/source-sans-3/400.css';
+import '@fontsource/source-sans-3/500.css';
+import '@fontsource/source-sans-3/600.css';
+import '@fontsource/source-sans-3/700.css';
+import '@fontsource/source-serif-4/600.css';
+import '@fontsource/source-code-pro/400.css';
+import '@fontsource/source-code-pro/600.css';
 import './styles.css';
 import './styles/dashboard.css';
 import './styles/landing.css';

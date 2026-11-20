@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, CalendarClock, ListChecks, PlusCircle, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowRight, ListChecks } from 'lucide-react';
 import api, { errorMessage } from '../api';
 import { fmtNumber } from '../lib/format';
 import { useAuth } from '../context/AuthContext';
@@ -11,7 +11,7 @@ import ActivityFeed from '../components/ActivityFeed';
 import JobsTable from '../components/JobsTable';
 import JobDrawer from '../components/JobDrawer';
 import { Empty, ErrorBanner, SkeletonRows } from '../components/atoms';
-import { KpiRow, QueueHealth, StatusDonut, TypeBreakdown } from '../components/Widgets';
+import { KpiRow, StatusBars } from '../components/Widgets';
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -75,7 +75,6 @@ export default function Overview() {
 
   const dead = stats?.failedOrDead || 0;
   const first = (user?.name || '').split(' ')[0];
-  const today = new Date().toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
     <div className="stack">
@@ -83,7 +82,6 @@ export default function Overview() {
 
       <section className="hello">
         <div>
-          <span className="hello-date">{today}</span>
           <h2>{greeting()}{first ? `, ${first}` : ''}</h2>
           <p className="muted">
             {stats
@@ -92,11 +90,6 @@ export default function Overview() {
                 : 'The queue is quiet. Everything submitted so far has finished.'
               : 'Loading your workspace…'}
           </p>
-        </div>
-        <div className="hello-actions">
-          <Link to="/app/jobs/new" className="btn primary"><PlusCircle size={16} /> New job</Link>
-          <Link to="/app/jobs/new?type=process-csv" className="btn"><Upload size={16} /> Import CSV</Link>
-          <Link to="/app/schedules" className="btn"><CalendarClock size={16} /> Schedules</Link>
         </div>
       </section>
 
@@ -125,7 +118,7 @@ export default function Overview() {
           <div className="panel-head">
             <h2>Jobs by status</h2>
           </div>
-          <div className="panel-body"><StatusDonut stats={stats} /></div>
+          <div className="panel-body"><StatusBars stats={stats} /></div>
         </section>
       </div>
 
@@ -134,7 +127,7 @@ export default function Overview() {
           <div className="panel-head">
             <h2>Recent jobs</h2>
             <div className="right">
-              <Link to="/app/jobs" className="btn sm">View all jobs <ArrowRight size={14} /></Link>
+              <Link to="/app/jobs" className="btn sm">View all</Link>
             </div>
           </div>
           {jobs === null ? (
@@ -154,17 +147,6 @@ export default function Overview() {
             <span className="live-dot" aria-hidden="true" />
           </div>
           <ActivityFeed events={events} names={names} />
-        </section>
-      </div>
-
-      <div className="grid-two">
-        <section className="panel">
-          <div className="panel-head"><h2>Jobs by type</h2><span className="sub">completed, in progress, dead</span></div>
-          <div className="panel-body"><TypeBreakdown stats={stats} /></div>
-        </section>
-        <section className="panel">
-          <div className="panel-head"><h2>Queue health</h2><span className="sub">live from the queue</span></div>
-          <div className="panel-body"><QueueHealth stats={stats} /></div>
         </section>
       </div>
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Search, ChevronLeft, ChevronRight, ListChecks, Download, Ban, X, RefreshCw } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, ListChecks, Download } from 'lucide-react';
 import api, { errorMessage } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useLive } from '../context/LiveContext';
@@ -10,7 +10,6 @@ import JobDrawer from '../components/JobDrawer';
 import { Empty, ErrorBanner, SkeletonRows } from '../components/atoms';
 import { STATUS_LABEL, TYPE_LABEL, fmtNumber } from '../lib/format';
 
-const CANCELLABLE = new Set(['queued', 'scheduled']);
 const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
 const STATUSES = ['queued', 'processing', 'completed', 'retrying', 'dead', 'scheduled', 'cancelled'];
@@ -20,7 +19,6 @@ export default function Jobs() {
   const { isAdmin } = useAuth();
   const { subscribe } = useLive();
   const toast = useToast();
-  const [selected, setSelected] = useState(new Set());
   const [working, setWorking] = useState(false);
   const [params, setParams] = useSearchParams();
   const [data, setData] = useState(null);
@@ -77,23 +75,6 @@ export default function Jobs() {
     return () => { off(); clearTimeout(timer.current); };
   }, [subscribe, load, page]);
 
-  // Selection is per page: changing filters or pages starts fresh.
-  useEffect(() => setSelected(new Set()), [status, type, search, page]);
-  const toggle = (id) => setSelected((cur) => { const n = new Set(cur); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const toggleAll = () => setSelected((cur) => (data?.items.every((j) => cur.has(j.id)) ? new Set() : new Set(data.items.map((j) => j.id))));
-
-  const cancelSelected = async () => {
-    const targets = data.items.filter((j) => selected.has(j.id) && CANCELLABLE.has(j.status));
-    if (!targets.length) return toast.push('Only queued or scheduled jobs can be cancelled.', { kind: 'err' });
-    setWorking(true);
-    const results = await Promise.allSettled(targets.map((j) => api.post(`/jobs/${j.id}/cancel`)));
-    const ok = results.filter((r) => r.status === 'fulfilled').length;
-    toast.push(`${ok} job${ok === 1 ? '' : 's'} cancelled${ok < targets.length ? `, ${targets.length - ok} could not be` : ''}`, { kind: ok ? 'ok' : 'err' });
-    setSelected(new Set());
-    setWorking(false);
-    load();
-  };
-
   // Walks every page of the current filter (up to 1,000 rows) and saves it as a CSV file.
   const exportCsv = async () => {
     setWorking(true);
@@ -142,20 +123,9 @@ export default function Jobs() {
           ))}
         </div>
         <div className="toolbar-end">
-          <button className="btn sm ghost" onClick={load} aria-label="Refresh"><RefreshCw size={14} /></button>
           <button className="btn sm" onClick={exportCsv} disabled={working || !data?.total}><Download size={14} /> Export CSV</button>
         </div>
       </div>
-
-      {selected.size > 0 && (
-        <div className="bulkbar" role="region" aria-label="Bulk actions">
-          <b>{selected.size} selected</b>
-          <span className="muted">Only queued or scheduled jobs can be cancelled.</span>
-          <span className="grow" />
-          <button className="btn sm danger" onClick={cancelSelected} disabled={working}><Ban size={14} /> Cancel selected</button>
-          <button className="btn sm ghost" onClick={() => setSelected(new Set())}><X size={14} /> Clear</button>
-        </div>
-      )}
 
       <section className="panel">
         {data === null ? (
@@ -172,7 +142,7 @@ export default function Jobs() {
           )
         ) : (
           <>
-            <JobsTable jobs={data.items} onOpen={(id) => setParam({ open: id })} flashId={flashId} showOwner={isAdmin} selected={selected} onToggle={toggle} onToggleAll={toggleAll} />
+            <JobsTable jobs={data.items} onOpen={(id) => setParam({ open: id })} flashId={flashId} showOwner={isAdmin} />
             <div className="pager">
               <span>{fmtNumber(data.total)} job{data.total === 1 ? '' : 's'} · page {data.page} of {data.pages}</span>
               <div className="btns">
