@@ -36,7 +36,7 @@ Requires Docker.
 docker compose up --build
 ```
 
-Open **http://localhost:5173** for the home page, then choose **Try the live demo** or use **Admin demo** / **Member demo** on the sign-in page. The dashboard lives at `/app`.
+Open **[http://localhost:5173](https://orchestra-aanya.duckdns.org/)** for the home page, then choose **Try the live demo** or use **Admin demo** / **Member demo** on the sign-in page. The dashboard lives at `/app`.
 
 | Account | Email | Password |
 | --- | --- | --- |
